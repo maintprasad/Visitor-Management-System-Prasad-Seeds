@@ -833,7 +833,7 @@ textarea { resize: vertical; min-height: 70px; }
 // ══════════════════════════════════════════
  
 // Ganti dengan URL Web App hasil Deploy di Google Apps Script
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbwg-HrYISW6cTLeWg_96AduoavIiRKDhj7kg04z0pCtCZS0-id5B-yEaUJ2kk8vw1I/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwON7LVvB43iiGRvRG7hxTAyVwGsfe2NabUdXJDMRrvQDUTdHf5qd_fOJXVr3DsujeL/exec';
  
 async function sendToGAS(action, data) {
   if (!GAS_URL) return { ok: false };
@@ -1986,7 +1986,47 @@ setInterval(updateTime, 1000);
 // ══════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════
-renderDashboard();
+async function loadFromGAS() {
+  if (!GAS_URL) { renderDashboard(); return; }
+  toast('Memuat data dari Google Sheets...', 'info');
+  try {
+    // Ambil data Visitors
+    const resV = await fetch(GAS_URL + '?action=GET_SHEET_DATA&sheet=Visitors');
+    const dataV = await resV.json();
+    if (dataV.rows && dataV.rows.length > 0) {
+      const visitors = dataV.rows.map(r => ({
+        id:        r[0],  name:     r[1],  company:  r[2],
+        phone:     r[3],  identity: r[4],  purpose:  r[5],
+        host:      r[6],  dept:     r[7],  notes:    r[8],
+        status:    r[9],  checkIn:  r[10], checkOut: r[11] || null,
+        createdAt: r[14],
+      })).filter(v => v.id && v.name);
+      DB.setVisitors(visitors);
+    }
+
+    // Ambil data Equipment
+    const resE = await fetch(GAS_URL + '?action=GET_SHEET_DATA&sheet=Equipment');
+    const dataE = await resE.json();
+    if (dataE.rows && dataE.rows.length > 0) {
+      const equipment = dataE.rows.map(r => ({
+        id:        r[0],  name:      r[1],  serial:    r[2],
+        owner:     r[3],  gatePass:  r[4],  condition: r[5],
+        status:    r[6],  notes:     r[7],  dateIn:    r[8],
+        dateOut:   r[9] || null,
+      })).filter(e => e.id && e.name);
+      DB.setEquipment(equipment);
+    }
+
+    toast('Data berhasil dimuat dari Google Sheets', 'success');
+  } catch (err) {
+    console.warn('Gagal load dari GAS:', err.message);
+    toast('Gagal memuat dari Sheets — pakai data lokal', 'info');
+  }
+  renderDashboard();
+  checkAlerts();
+}
+
+loadFromGAS();
 addAudit('LOGIN', 'SYSTEM', 'Ahmad Rizal — Security Officer — login');
 </script>
 </body>
