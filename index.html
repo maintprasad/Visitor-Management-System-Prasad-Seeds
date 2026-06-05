@@ -342,6 +342,7 @@ textarea { resize: vertical; min-height: 70px; }
     <div class="sb-item" onclick="nav('alerts',this)"><i class="ti ti-bell"></i> Alerts <span class="sb-badge" id="badge-alerts">0</span></div>
     <div class="sb-item" onclick="nav('emergency',this)"><i class="ti ti-alert-triangle"></i> Emergency</div>
     <div class="sb-section">Records</div>
+<div class="sb-item" onclick="window.open('print-module.html','_blank')"><i class="ti ti-printer"></i> Print Center</div>
     <div class="sb-item" onclick="nav('qr',this)"><i class="ti ti-qrcode"></i> QR System</div>
     <div class="sb-item" onclick="nav('reports',this)"><i class="ti ti-chart-bar"></i> Reports</div>
     <div class="sb-item" onclick="nav('audit',this)"><i class="ti ti-history"></i> Audit Trail</div>
@@ -579,10 +580,13 @@ textarea { resize: vertical; min-height: 70px; }
             <input type="text" id="qr-scan-input" placeholder="VIS-XXXXXXXX">
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-primary" onclick="qrCheckin()"><i class="ti ti-login"></i> Check In</button>
-            <button class="btn btn-success" onclick="qrCheckout()"><i class="ti ti-logout"></i> Check Out</button>
-            <button class="btn" onclick="qrLookup()"><i class="ti ti-search"></i> Lookup</button>
-          </div>
+  <button class="btn btn-primary" onclick="qrCheckin()"><i class="ti ti-login"></i> Check In</button>
+  <button class="btn btn-success" onclick="qrCheckout()"><i class="ti ti-logout"></i> Check Out</button>
+  <button class="btn" onclick="qrLookup()"><i class="ti ti-search"></i> Lookup</button>
+</div>
+<div style="margin-top:12px;padding:10px;background:var(--green-light);border-radius:var(--radius-sm);font-size:12px;color:var(--green-text)">
+  <i class="ti ti-info-circle"></i> <strong>Security:</strong> Scan QR visitor → masukkan ID di atas → klik <strong>Check Out</strong> untuk proses keluar.
+</div>
           <div id="qr-result" class="mt12"></div>
         </div>
       </div>
