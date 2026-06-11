@@ -2,7 +2,10 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f1829">
 <title>Visitor System Management</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -30,84 +33,167 @@
   --text: #111827;
   --text2: #374151;
   --text3: #6b7280;
-  --bg: #f9fafb;
+  --bg: #f3f4f6;
   --white: #ffffff;
-  --sidebar-w: 224px;
-  --radius: 10px;
-  --radius-sm: 6px;
+  --sidebar-w: 240px;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --bottom-nav-h: 0px; /* set to 60px on mobile via media query */
   font-family: 'DM Sans', sans-serif;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; overflow-x: hidden; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
 button { font-family: 'DM Sans', sans-serif; cursor: pointer; }
 input, select, textarea { font-family: 'DM Sans', sans-serif; }
 
 /* ── LAYOUT ── */
 .app { display: flex; min-height: 100vh; }
+
 .sidebar {
   width: var(--sidebar-w); min-width: var(--sidebar-w);
   background: var(--navy);
   display: flex; flex-direction: column;
   position: fixed; top: 0; left: 0; height: 100vh;
   z-index: 100; overflow-y: auto;
+  transform: translateX(-100%);
+  transition: transform .28s cubic-bezier(.4,0,.2,1);
+  box-shadow: 4px 0 32px rgba(0,0,0,.22);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
-.main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+.sidebar::-webkit-scrollbar { display: none; }
+.sidebar.open { transform: translateX(0); }
 
-/* ── SIDEBAR ── */
+.main {
+  margin-left: 0; flex: 1;
+  display: flex; flex-direction: column;
+  min-height: 100vh;
+  transition: margin-left .28s cubic-bezier(.4,0,.2,1);
+  /* bottom padding so content not hidden behind bottom nav */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.main.pushed { margin-left: var(--sidebar-w); }
+
+/* ── SIDEBAR TOGGLE (desktop only) ── */
+#sb-toggle {
+  position: fixed;
+  bottom: 28px; left: 28px;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--navy);
+  color: #fff;
+  border: none;
+  box-shadow: 0 4px 20px rgba(0,0,0,.28);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 300;
+  transition: background .2s, transform .18s;
+}
+#sb-toggle:hover { background: var(--blue); transform: scale(1.08); }
+#sb-toggle.open { background: var(--blue); }
+
+/* ── SIDEBAR OVERLAY ── */
+#sb-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.4);
+  z-index: 99;
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+#sb-overlay.show { display: block; }
+
+/* ── SIDEBAR INNER ── */
 .sb-logo {
   padding: 20px 16px 16px;
+  padding-top: calc(20px + env(safe-area-inset-top));
   border-bottom: 1px solid rgba(255,255,255,.08);
 }
 .sb-logo-wrap { display: flex; align-items: center; gap: 10px; }
 .sb-logo-icon {
-  width: 34px; height: 34px; background: var(--blue);
-  border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; background: var(--blue);
+  border-radius: 9px; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
 }
 .sb-logo-icon i { font-size: 18px; color: #fff; }
-.sb-logo-title { font-size: 13px; font-weight: 600; color: #fff; line-height: 1.2; }
-.sb-logo-sub { font-size: 10px; color: rgba(255,255,255,.4); margin-top: 2px; }
+.sb-logo-title { font-size: 13px; font-weight: 700; color: #fff; line-height: 1.2; letter-spacing: -.01em; }
+.sb-logo-sub { font-size: 10px; color: rgba(255,255,255,.38); margin-top: 2px; letter-spacing: .03em; text-transform: uppercase; }
+
 .sb-nav { flex: 1; padding: 10px 8px; }
-.sb-section { font-size: 10px; font-weight: 600; color: rgba(255,255,255,.3); letter-spacing: .08em; text-transform: uppercase; padding: 14px 8px 5px; }
-.sb-item {
-  display: flex; align-items: center; gap: 9px;
-  padding: 8px 10px; border-radius: var(--radius-sm);
-  cursor: pointer; font-size: 13px; color: rgba(255,255,255,.55);
-  transition: all .15s; margin-bottom: 1px; user-select: none;
+.sb-section {
+  font-size: 9.5px; font-weight: 700; color: rgba(255,255,255,.28);
+  letter-spacing: .1em; text-transform: uppercase; padding: 14px 10px 5px;
 }
-.sb-item:hover { background: rgba(255,255,255,.07); color: rgba(255,255,255,.85); }
+.sb-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 8px;
+  cursor: pointer; font-size: 13.5px; font-weight: 500;
+  color: rgba(255,255,255,.58);
+  transition: all .14s; margin-bottom: 2px; user-select: none;
+  min-height: 44px;
+}
+.sb-item:hover { background: rgba(255,255,255,.07); color: rgba(255,255,255,.88); }
 .sb-item.active { background: var(--blue); color: #fff; }
-.sb-item i { font-size: 17px; width: 18px; flex-shrink: 0; }
-.sb-badge { margin-left: auto; font-size: 10px; background: var(--red); color: #fff; padding: 1px 6px; border-radius: 20px; font-weight: 600; }
+.sb-item i { font-size: 18px; width: 20px; flex-shrink: 0; }
+.sb-badge {
+  margin-left: auto; font-size: 10px;
+  background: var(--red); color: #fff;
+  padding: 2px 7px; border-radius: 20px; font-weight: 700;
+}
+
 .sb-user {
-  padding: 12px 12px; border-top: 1px solid rgba(255,255,255,.08);
+  padding: 14px 14px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255,255,255,.08);
   display: flex; align-items: center; gap: 10px;
 }
 .sb-avatar {
-  width: 32px; height: 32px; border-radius: 50%; background: var(--blue);
+  width: 34px; height: 34px; border-radius: 50%; background: var(--blue);
   display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 600; color: #fff; flex-shrink: 0;
+  font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
 }
-.sb-uname { font-size: 12px; font-weight: 500; color: rgba(255,255,255,.85); }
-.sb-urole { font-size: 11px; color: rgba(255,255,255,.35); margin-top: 1px; }
+.sb-uname { font-size: 13px; font-weight: 600; color: rgba(255,255,255,.88); }
+.sb-urole { font-size: 11px; color: rgba(255,255,255,.32); margin-top: 1px; }
 
 /* ── TOPBAR ── */
 .topbar {
-  background: var(--white); border-bottom: 1px solid var(--border);
-  padding: 12px 24px; display: flex; align-items: center; justify-content: space-between;
-  gap: 16px; position: sticky; top: 0; z-index: 50;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 18px;
+  padding-top: calc(12px + env(safe-area-inset-top));
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; position: sticky; top: 0; z-index: 50;
 }
-.topbar-title { font-size: 16px; font-weight: 600; color: var(--text); }
-.topbar-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
-.topbar-actions { display: flex; align-items: center; gap: 8px; }
+.topbar-title { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -.02em; }
+.topbar-sub { font-size: 11px; color: var(--text3); margin-top: 1px; font-weight: 400; }
+.topbar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
 /* ── BUTTONS ── */
 .btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 14px; border-radius: var(--radius-sm);
-  font-size: 13px; font-weight: 500; border: 1px solid var(--border);
-  background: var(--white); color: var(--text2); transition: all .15s;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 16px; border-radius: var(--radius-sm);
+  font-size: 13.5px; font-weight: 600; border: 1.5px solid var(--border);
+  background: var(--white); color: var(--text2);
+  transition: all .14s; min-height: 40px;
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
 }
+.btn:active { transform: scale(.97); }
 .btn:hover { background: var(--gray-light); }
 .btn i { font-size: 15px; }
 .btn-primary { background: var(--blue); color: #fff; border-color: var(--blue); }
@@ -116,109 +202,197 @@ input, select, textarea { font-family: 'DM Sans', sans-serif; }
 .btn-danger:hover { background: #b91c1c; }
 .btn-success { background: var(--green); color: #fff; border-color: var(--green); }
 .btn-success:hover { background: #15803d; }
-.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-sm { padding: 6px 11px; font-size: 12px; min-height: 34px; }
 .btn-sm i { font-size: 13px; }
 
 /* ── CONTENT ── */
-.content { padding: 20px 24px; flex: 1; }
+.content { padding: 16px 18px; flex: 1; }
 
 /* ── STAT CARDS ── */
-.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
-.stat-card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
-.stat-label { font-size: 12px; color: var(--text3); display: flex; align-items: center; gap: 5px; margin-bottom: 8px; }
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px; margin-bottom: 14px;
+}
+.stat-card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 14px 12px;
+}
+.stat-label {
+  font-size: 11px; font-weight: 600; color: var(--text3);
+  display: flex; align-items: center; gap: 5px; margin-bottom: 7px;
+  text-transform: uppercase; letter-spacing: .04em;
+}
 .stat-label i { font-size: 14px; }
-.stat-val { font-size: 28px; font-weight: 600; color: var(--text); line-height: 1; }
-.stat-sub { font-size: 11px; color: var(--text3); margin-top: 5px; }
+.stat-val { font-size: 30px; font-weight: 700; color: var(--text); line-height: 1; letter-spacing: -.03em; }
+.stat-sub { font-size: 11px; color: var(--text3); margin-top: 5px; font-weight: 400; }
 .stat-val.c-blue { color: var(--blue); }
 .stat-val.c-green { color: var(--green); }
 .stat-val.c-red { color: var(--red); }
 .stat-val.c-amber { color: var(--amber); }
 
 /* ── CARDS ── */
-.card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
-.card-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.card-title {
+  font-size: 14px; font-weight: 700; color: var(--text);
+  margin-bottom: 14px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  letter-spacing: -.01em;
+}
 .card-title-left { display: flex; align-items: center; gap: 8px; }
 .card-title i { font-size: 16px; color: var(--text3); }
-.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 0; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 0; }
 
 /* ── TABLE ── */
-.table-wrap { overflow-x: auto; }
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th { text-align: left; padding: 8px 12px; font-size: 11px; font-weight: 600; color: var(--text3); background: var(--bg); border-bottom: 1px solid var(--border); white-space: nowrap; }
-td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text2); vertical-align: middle; }
+th {
+  text-align: left; padding: 9px 12px;
+  font-size: 10.5px; font-weight: 700; color: var(--text3);
+  background: var(--bg); border-bottom: 1.5px solid var(--border);
+  white-space: nowrap; letter-spacing: .05em; text-transform: uppercase;
+}
+td {
+  padding: 11px 12px; border-bottom: 1px solid var(--border);
+  color: var(--text2); vertical-align: middle;
+}
 tr:last-child td { border-bottom: none; }
 tr:hover td { background: #f9fafb; }
-.td-main { font-weight: 500; color: var(--text); }
-.td-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.td-main { font-weight: 600; color: var(--text); font-size: 13.5px; }
+.td-sub { font-size: 11px; color: var(--text3); margin-top: 2px; font-weight: 400; }
 
 /* ── PILLS ── */
-.pill { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
-.pill-inside { background: var(--green-light); color: var(--green-text); }
+.pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 20px;
+  font-size: 11px; font-weight: 700; white-space: nowrap; letter-spacing: .02em;
+}
+.pill-inside  { background: var(--green-light); color: var(--green-text); }
 .pill-waiting { background: var(--amber-light); color: var(--amber-text); }
-.pill-out { background: var(--gray-light); color: var(--gray); }
-.pill-overstay { background: var(--red-light); color: var(--red-text); }
+.pill-out     { background: var(--gray-light); color: var(--gray); }
+.pill-overstay{ background: var(--red-light); color: var(--red-text); }
 .pill-pending { background: var(--blue-light); color: var(--blue-text); }
-.pill-high { background: var(--red-light); color: var(--red-text); }
-.pill-medium { background: var(--amber-light); color: var(--amber-text); }
-.pill-low { background: var(--green-light); color: var(--green-text); }
-.pill-critical { background: var(--red); color: #fff; }
-.pill-good { background: var(--green-light); color: var(--green-text); }
+.pill-high    { background: var(--red-light); color: var(--red-text); }
+.pill-medium  { background: var(--amber-light); color: var(--amber-text); }
+.pill-low     { background: var(--green-light); color: var(--green-text); }
+.pill-critical{ background: var(--red); color: #fff; }
+.pill-good    { background: var(--green-light); color: var(--green-text); }
 
 /* ── TIMER ── */
-.timer { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--text2); }
+.timer { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; color: var(--text2); }
 .timer.warn { color: var(--amber); }
-.timer.danger { color: var(--red); font-weight: 600; }
+.timer.danger { color: var(--red); font-weight: 700; }
 
 /* ── MODAL ── */
 .modal-bg {
   display: none; position: fixed; inset: 0;
-  background: rgba(0,0,0,.45); z-index: 200;
-  align-items: center; justify-content: center; padding: 20px;
+  background: rgba(0,0,0,.5); z-index: 200;
+  align-items: flex-end; justify-content: center;
+  padding: 0;
 }
 .modal-bg.open { display: flex; }
 .modal {
-  background: var(--white); border-radius: var(--radius); padding: 24px;
-  width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0,0,0,.15);
+  background: var(--white);
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 20px 18px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  width: 100%; max-width: 100%;
+  max-height: 92vh; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  box-shadow: 0 -8px 40px rgba(0,0,0,.18);
+  /* drag handle cue */
+  position: relative;
 }
-.modal-title { font-size: 16px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
-.modal-close { background: none; border: none; font-size: 20px; color: var(--text3); cursor: pointer; padding: 0; line-height: 1; }
-.modal-close:hover { color: var(--text); }
+.modal::before {
+  content: '';
+  display: block;
+  width: 36px; height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 0 auto 16px;
+}
+.modal-title {
+  font-size: 16px; font-weight: 700; margin-bottom: 18px;
+  display: flex; align-items: center; justify-content: space-between;
+  letter-spacing: -.02em;
+}
+.modal-close {
+  background: var(--gray-light); border: none;
+  width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; color: var(--text3); cursor: pointer;
+}
+.modal-close:hover { background: var(--border); color: var(--text); }
 
 /* ── FORM ── */
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-group { display: flex; flex-direction: column; gap: 5px; }
 .form-group.full { grid-column: 1 / -1; }
-label { font-size: 12px; font-weight: 500; color: var(--text2); }
+label { font-size: 12px; font-weight: 600; color: var(--text2); letter-spacing: .01em; }
 input, select, textarea {
-  padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
-  font-size: 13px; color: var(--text); background: var(--white); width: 100%;
-  transition: border .15s; outline: none;
+  padding: 10px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 15px; color: var(--text); background: var(--white); width: 100%;
+  transition: border .14s; outline: none;
+  min-height: 44px;
+  -webkit-appearance: none;
+  appearance: none;
 }
-input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
-textarea { resize: vertical; min-height: 70px; }
-.form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+}
+textarea { resize: vertical; min-height: 72px; }
+.form-actions {
+  display: flex; gap: 8px; justify-content: flex-end;
+  margin-top: 18px; padding-top: 14px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.form-actions .btn { flex: 1; min-width: 0; justify-content: center; }
 
 /* ── SEARCH BAR ── */
-.search-wrap { display: flex; gap: 8px; margin-bottom: 14px; }
-.search-input-wrap { position: relative; flex: 1; }
-.search-input-wrap i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--text3); pointer-events: none; }
-.search-input { padding-left: 32px !important; }
+.search-wrap { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.search-input-wrap { position: relative; flex: 1; min-width: 160px; }
+.search-input-wrap i {
+  position: absolute; left: 11px; top: 50%;
+  transform: translateY(-50%); font-size: 16px; color: var(--text3); pointer-events: none;
+}
+.search-input { padding-left: 36px !important; }
 
 /* ── CHARTS ── */
 .chart-bars { display: flex; align-items: flex-end; gap: 6px; height: 100px; }
-.bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.bar { width: 100%; border-radius: 3px 3px 0 0; background: var(--blue); min-height: 4px; }
+.bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.bar { width: 100%; border-radius: 4px 4px 0 0; background: var(--blue); min-height: 4px; }
 .bar.alt { background: var(--green); }
-.bar.dim { opacity: .35; }
+.bar.dim { opacity: .32; }
 .bar-label { font-size: 10px; color: var(--text3); font-family: 'DM Mono', monospace; }
-.bar-val { font-size: 10px; color: var(--text3); font-family: 'DM Mono', monospace; }
+.bar-val { font-size: 10px; color: var(--text3); font-family: 'DM Mono', monospace; font-weight: 500; }
 
 /* ── ALERTS ── */
-.alert-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.alert-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 13px 0; border-bottom: 1px solid var(--border);
+}
 .alert-row:last-child { border-bottom: none; }
-.alert-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.alert-icon i { font-size: 16px; }
+.alert-icon {
+  width: 36px; height: 36px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.alert-icon i { font-size: 17px; }
 .alert-icon.high { background: var(--red-light); }
 .alert-icon.high i { color: var(--red); }
 .alert-icon.medium { background: var(--amber-light); }
@@ -226,49 +400,53 @@ textarea { resize: vertical; min-height: 70px; }
 .alert-icon.low { background: var(--green-light); }
 .alert-icon.low i { color: var(--green); }
 .alert-body { flex: 1; }
-.alert-title { font-size: 13px; font-weight: 500; color: var(--text); }
-.alert-meta { font-size: 11px; color: var(--text3); margin-top: 3px; }
+.alert-title { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.alert-meta { font-size: 11.5px; color: var(--text3); margin-top: 3px; }
 .alert-action { display: flex; align-items: flex-start; margin-top: 4px; }
 
 /* ── AUDIT ── */
-.audit-row { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.audit-row {
+  display: flex; gap: 10px; padding: 10px 0;
+  border-bottom: 1px solid var(--border); font-size: 12px;
+  flex-wrap: wrap;
+}
 .audit-row:last-child { border-bottom: none; }
-.audit-action { font-weight: 500; color: var(--text); min-width: 100px; }
-.audit-user { color: var(--blue); }
-.audit-time { font-family: 'DM Mono', monospace; color: var(--text3); font-size: 11px; min-width: 120px; }
-.audit-detail { color: var(--text3); flex: 1; }
+.audit-action { font-weight: 600; color: var(--text); min-width: 90px; }
+.audit-user { color: var(--blue); font-weight: 500; }
+.audit-time { font-family: 'DM Mono', monospace; color: var(--text3); font-size: 11px; min-width: 110px; }
+.audit-detail { color: var(--text3); flex: 1; min-width: 100px; }
 
 /* ── EMPTY STATE ── */
 .empty { text-align: center; padding: 40px 20px; color: var(--text3); }
-.empty i { font-size: 40px; margin-bottom: 10px; display: block; opacity: .4; }
-.empty p { font-size: 13px; }
+.empty i { font-size: 36px; margin-bottom: 10px; display: block; opacity: .35; }
+.empty p { font-size: 13.5px; font-weight: 500; }
 
 /* ── EMERGENCY BANNER ── */
 .emergency-banner {
-  background: var(--red); color: #fff; padding: 12px 20px;
+  background: var(--red); color: #fff; padding: 14px 16px;
   display: flex; align-items: center; gap: 10px;
-  font-weight: 600; font-size: 14px; border-radius: var(--radius);
-  margin-bottom: 16px;
+  font-weight: 700; font-size: 14px; border-radius: var(--radius);
+  margin-bottom: 14px; flex-wrap: wrap;
 }
-.emergency-banner i { font-size: 22px; }
+.emergency-banner i { font-size: 22px; flex-shrink: 0; }
 
-/* ── QR DISPLAY ── */
+/* ── QR ── */
 .qr-box {
   border: 2px dashed var(--border); border-radius: var(--radius);
   padding: 20px; text-align: center; background: var(--bg);
 }
 .qr-img {
-  width: 160px; height: 160px; border-radius: 8px;
+  width: 160px; height: 160px; border-radius: 10px;
   margin: 0 auto 12px; background: var(--white);
   display: flex; align-items: center; justify-content: center;
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
 }
 
 /* ── PHOTO UPLOAD ── */
 .photo-upload {
   border: 2px dashed var(--border); border-radius: var(--radius-sm);
   padding: 20px; text-align: center; cursor: pointer;
-  transition: border .15s; background: var(--bg);
+  transition: border .14s; background: var(--bg);
 }
 .photo-upload:hover { border-color: var(--blue); }
 .photo-upload i { font-size: 28px; color: var(--text3); }
@@ -277,52 +455,220 @@ textarea { resize: vertical; min-height: 70px; }
 
 /* ── BADGE PREVIEW ── */
 .badge-card {
-  background: var(--navy); border-radius: var(--radius); padding: 20px;
-  color: #fff; max-width: 280px;
+  background: var(--navy); border-radius: var(--radius); padding: 20px; color: #fff;
 }
-.badge-card .bc-name { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
-.badge-card .bc-company { font-size: 12px; color: rgba(255,255,255,.6); }
-.badge-card .bc-detail { font-size: 11px; color: rgba(255,255,255,.5); margin-top: 12px; }
-.badge-card .bc-status { display: inline-flex; background: var(--blue); padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-top: 8px; }
+.badge-card .bc-name { font-size: 18px; font-weight: 700; margin-bottom: 4px; letter-spacing: -.02em; }
+.badge-card .bc-company { font-size: 12px; color: rgba(255,255,255,.58); }
+.badge-card .bc-detail { font-size: 11px; color: rgba(255,255,255,.45); margin-top: 12px; }
+.badge-card .bc-status {
+  display: inline-flex; background: var(--blue);
+  padding: 3px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; margin-top: 8px;
+}
 
 /* ── TABS ── */
-.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
-.tab { padding: 8px 16px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text3); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s; }
+.tabs {
+  display: flex; gap: 2px; border-bottom: 1.5px solid var(--border);
+  margin-bottom: 14px; flex-wrap: wrap; overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.tab {
+  padding: 10px 16px; font-size: 13px; font-weight: 600;
+  cursor: pointer; color: var(--text3);
+  border-bottom: 2.5px solid transparent; margin-bottom: -1.5px;
+  transition: all .14s; white-space: nowrap; min-height: 44px;
+  display: flex; align-items: center;
+}
 .tab.active { color: var(--blue); border-bottom-color: var(--blue); }
 .tab:hover:not(.active) { color: var(--text); }
 .tab-pane { display: none; }
 .tab-pane.active { display: block; }
 
+/* ── TYPE TABS ── */
+.type-tabs {
+  display: flex; gap: 6px; margin-bottom: 14px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.type-tabs::-webkit-scrollbar { display: none; }
+.type-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 20px;
+  font-size: 12.5px; font-weight: 600;
+  cursor: pointer; border: 2px solid var(--border);
+  background: var(--white); color: var(--text3);
+  transition: all .14s; white-space: nowrap; min-height: 40px;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.type-tab:hover { border-color: var(--blue); color: var(--blue); }
+.type-tab.active { border-color: var(--blue); background: var(--blue); color: #fff; }
+.type-tab .count {
+  background: rgba(255,255,255,.25);
+  padding: 1px 6px; border-radius: 10px; font-size: 11px;
+}
+.type-tab:not(.active) .count { background: var(--gray-light); color: var(--text3); }
+
 /* ── TOAST ── */
-#toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+#toast-container {
+  position: fixed; bottom: 80px; right: 16px;
+  z-index: 999; display: flex; flex-direction: column; gap: 8px;
+}
 .toast {
-  background: var(--navy); color: #fff; padding: 10px 16px;
-  border-radius: var(--radius-sm); font-size: 13px;
-  display: flex; align-items: center; gap: 8px;
-  animation: slideIn .3s ease; min-width: 240px;
-  box-shadow: 0 4px 16px rgba(0,0,0,.15);
+  background: #1f2937; color: #fff; padding: 11px 16px;
+  border-radius: var(--radius-sm); font-size: 13.5px; font-weight: 500;
+  display: flex; align-items: center; gap: 9px;
+  animation: slideIn .25s ease; min-width: 220px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.2);
 }
 .toast.success { border-left: 3px solid var(--green); }
-.toast.error { border-left: 3px solid var(--red); }
-.toast.info { border-left: 3px solid var(--blue); }
-@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.toast.error   { border-left: 3px solid var(--red); }
+.toast.info    { border-left: 3px solid var(--blue); }
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+/* ── BOTTOM NAV (mobile only) ── */
+.bottom-nav {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--white);
+  border-top: 1.5px solid var(--border);
+  padding: 8px 4px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  z-index: 150;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: end;
+}
+.bn-item {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 6px 4px; cursor: pointer; border-radius: 8px;
+  -webkit-tap-highlight-color: transparent;
+  color: var(--text3); transition: color .14s;
+  font-size: 9.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em;
+  position: relative;
+}
+.bn-item i { font-size: 22px; }
+.bn-item.active { color: var(--blue); }
+.bn-item .bn-badge {
+  position: absolute; top: 2px; right: 50%;
+  transform: translateX(6px);
+  background: var(--red); color: #fff;
+  font-size: 9px; font-weight: 700;
+  padding: 1px 5px; border-radius: 10px;
+  min-width: 16px; text-align: center;
+}
 
 /* ── UTILS ── */
-.mt8 { margin-top: 8px; }
+.mt8  { margin-top: 8px; }
 .mt12 { margin-top: 12px; }
 .mt16 { margin-top: 16px; }
 .mb16 { margin-bottom: 16px; }
 .text-center { text-align: center; }
 .flex-between { display: flex; align-items: center; justify-content: space-between; }
-.flex-gap8 { display: flex; align-items: center; gap: 8px; }
+.flex-gap8 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .mono { font-family: 'DM Mono', monospace; font-size: 12px; }
+
+/* ══════════════════════════════
+   MOBILE RESPONSIVE
+══════════════════════════════ */
+@media (max-width: 768px) {
+
+  :root {
+    --bottom-nav-h: 60px;
+  }
+
+  /* Show bottom nav, hide desktop toggle */
+  .bottom-nav { display: grid; }
+  #sb-toggle { display: none; }
+
+  /* Mobile: sidebar overlay di atas, main TIDAK bergeser */
+  .main.pushed { margin-left: 0 !important; }
+
+  /* Main content gets bottom padding for nav */
+  .main {
+    padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
+  }
+
+  /* Content padding tighter */
+  .content { padding: 12px 14px; }
+
+  /* Topbar compact */
+  .topbar { padding: 10px 14px; padding-top: calc(10px + env(safe-area-inset-top)); }
+  .topbar-title { font-size: 15px; }
+  .topbar-sub { display: none; }
+
+  /* Stat grid: 2-col on mobile */
+  .stat-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px; }
+  .stat-val { font-size: 26px; }
+  .stat-card { padding: 12px; }
+
+  /* row2 = single col */
+  .row2 { grid-template-columns: 1fr; }
+
+  /* Visitor type tabs — horizontal scroll */
+  .type-tabs { gap: 5px; }
+
+  /* Table: smaller font */
+  table { font-size: 12px; }
+  th { font-size: 10px; padding: 8px 8px; }
+  td { padding: 10px 8px; }
+  .td-main { font-size: 13px; }
+
+  /* Form grid: single column */
+  .form-grid { grid-template-columns: 1fr; }
+  .form-group.full { grid-column: 1; }
+
+  /* Modal: bottom sheet, taller */
+  .modal { max-height: 95vh; border-radius: 16px 16px 0 0; }
+
+  /* Buttons in tables: icon-only or compact */
+  .btn-sm { padding: 7px 9px; }
+
+  /* Toast position above bottom nav */
+  #toast-container { bottom: calc(var(--bottom-nav-h) + 12px + env(safe-area-inset-bottom)); right: 12px; }
+
+  /* Search wrap */
+  .search-wrap { flex-wrap: wrap; }
+  .search-wrap select { width: 100% !important; }
+
+  /* Emergency banner */
+  .emergency-banner { font-size: 13px; padding: 12px 14px; }
+
+  /* Tabs: scrollable */
+  .tabs { flex-wrap: nowrap; overflow-x: auto; }
+  .tab { font-size: 12.5px; padding: 10px 14px; }
+
+  /* Cards */
+  .card { padding: 14px; border-radius: 10px; }
+  .card-title { font-size: 13.5px; margin-bottom: 12px; }
+}
+
+@media (min-width: 769px) {
+  /* Desktop: centered modal */
+  .modal-bg { align-items: center; padding: 20px; }
+  .modal {
+    border-radius: var(--radius);
+    max-width: 560px;
+    padding: 24px;
+    padding-bottom: 24px;
+  }
+  .modal::before { display: none; }
+}
 </style>
 </head>
 <body>
 <div class="app">
 
+<!-- TOGGLE BUTTON -->
+<button id="sb-toggle" onclick="toggleSidebar()"><i class="ti ti-menu-2" id="sb-toggle-icon"></i></button>
+<!-- OVERLAY -->
+<div id="sb-overlay" onclick="toggleSidebar()"></div>
+
 <!-- ════════ SIDEBAR ════════ -->
-<div class="sidebar">
+<div class="sidebar" id="sidebar">
   <div class="sb-logo">
     <div class="sb-logo-wrap">
       <div class="sb-logo-icon"><i class="ti ti-shield-check"></i></div>
@@ -366,7 +712,7 @@ textarea { resize: vertical; min-height: 70px; }
       <div class="topbar-sub" id="page-sub">Live monitoring · Real-time</div>
     </div>
     <div class="topbar-actions" id="topbar-actions">
-      <button class="btn btn-primary" onclick="openModal('modal-checkin')"><i class="ti ti-user-plus"></i> Check In Visitor</button>
+      <button class="btn btn-primary" onclick="openModal('modal-select-type')"><i class="ti ti-user-plus"></i> Check In Visitor</button>
     </div>
   </div>
 
@@ -375,11 +721,12 @@ textarea { resize: vertical; min-height: 70px; }
 
     <!-- ── DASHBOARD ── -->
     <div id="page-dashboard">
-      <div class="stat-grid">
+      <!-- Row 1: summary -->
+      <div class="stat-grid" style="grid-template-columns: repeat(4,1fr)">
         <div class="stat-card">
-          <div class="stat-label"><i class="ti ti-user-check" style="color:var(--green)"></i> Visitors Inside</div>
-          <div class="stat-val c-green" id="stat-inside">0</div>
-          <div class="stat-sub" id="stat-inside-sub">Active right now</div>
+          <div class="stat-label"><i class="ti ti-users" style="color:var(--blue)"></i> Total Inside</div>
+          <div class="stat-val c-blue" id="stat-inside">0</div>
+          <div class="stat-sub">Semua tipe aktif</div>
         </div>
         <div class="stat-card">
           <div class="stat-label"><i class="ti ti-package" style="color:var(--blue)"></i> Active Equipment</div>
@@ -395,6 +742,34 @@ textarea { resize: vertical; min-height: 70px; }
           <div class="stat-label"><i class="ti ti-calendar" style="color:var(--amber)"></i> Today's Visitors</div>
           <div class="stat-val c-amber" id="stat-today">0</div>
           <div class="stat-sub">Total check-ins today</div>
+        </div>
+      </div>
+      <!-- Row 2: per type -->
+      <div class="stat-grid" style="grid-template-columns: repeat(5,1fr); margin-top:-4px">
+        <div class="stat-card">
+          <div class="stat-label"><i class="ti ti-user" style="color:var(--blue)"></i> Guest</div>
+          <div class="stat-val c-blue" id="stat-guest">0</div>
+          <div class="stat-sub">Inside</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label"><i class="ti ti-hard-hat" style="color:var(--amber)"></i> Contractor</div>
+          <div class="stat-val c-amber" id="stat-contractor">0</div>
+          <div class="stat-sub">Inside</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label"><i class="ti ti-truck" style="color:var(--green)"></i> Driver</div>
+          <div class="stat-val c-green" id="stat-driver">0</div>
+          <div class="stat-sub">Inside</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label"><i class="ti ti-id-badge" style="color:var(--navy3)"></i> Employee Test</div>
+          <div class="stat-val" id="stat-employee" style="color:var(--navy3)">0</div>
+          <div class="stat-sub">Inside</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label"><i class="ti ti-clipboard-check" style="color:var(--red)"></i> Auditor</div>
+          <div class="stat-val c-red" id="stat-auditor">0</div>
+          <div class="stat-sub">Inside</div>
         </div>
       </div>
 
@@ -425,8 +800,18 @@ textarea { resize: vertical; min-height: 70px; }
 
     <!-- ── VISITOR MANAGEMENT ── -->
     <div id="page-visitors" style="display:none">
+      <!-- Type tabs -->
+      <div class="type-tabs" id="visitor-type-tabs">
+        <div class="type-tab active" onclick="switchVisitorType('all',this)"><i class="ti ti-list"></i> Semua <span class="count" id="tc-all">0</span></div>
+        <div class="type-tab" onclick="switchVisitorType('Guest',this)"><i class="ti ti-user"></i> Guest <span class="count" id="tc-guest">0</span></div>
+        <div class="type-tab" onclick="switchVisitorType('Contractor',this)"><i class="ti ti-hard-hat"></i> Contractor <span class="count" id="tc-contractor">0</span></div>
+        <div class="type-tab" onclick="switchVisitorType('Driver',this)"><i class="ti ti-truck"></i> Driver <span class="count" id="tc-driver">0</span></div>
+        <div class="type-tab" onclick="switchVisitorType('Employee Test',this)"><i class="ti ti-id-badge"></i> Employee Test <span class="count" id="tc-employee">0</span></div>
+        <div class="type-tab" onclick="switchVisitorType('Auditor',this)"><i class="ti ti-clipboard-check"></i> Auditor <span class="count" id="tc-auditor">0</span></div>
+      </div>
+      <!-- Status tabs -->
       <div class="tabs">
-        <div class="tab active" onclick="switchTab('visitors','all',this)">All Visitors</div>
+        <div class="tab active" onclick="switchTab('visitors','all',this)">Semua</div>
         <div class="tab" onclick="switchTab('visitors','inside',this)">Inside</div>
         <div class="tab" onclick="switchTab('visitors','today',this)">Today</div>
         <div class="tab" onclick="switchTab('visitors','out',this)">Checked Out</div>
@@ -443,12 +828,12 @@ textarea { resize: vertical; min-height: 70px; }
           <option value="Checked Out">Checked Out</option>
           <option value="Overstay">Overstay</option>
         </select>
-        <button class="btn btn-primary" onclick="openModal('modal-checkin')"><i class="ti ti-plus"></i> Check In</button>
+        <button class="btn btn-primary" onclick="openCheckinByType()"><i class="ti ti-plus"></i> Check In</button>
       </div>
       <div class="card" style="padding:0">
         <div class="table-wrap">
           <table>
-            <thead><tr><th>#</th><th>Visitor</th><th>Company</th><th>Host / PIC</th><th>Purpose</th><th>Check-in</th><th>Duration</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>#</th><th>Visitor</th><th>Tipe</th><th>Company</th><th>Host / PIC</th><th>Check-in</th><th>Duration</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody id="visitor-table"></tbody>
           </table>
         </div>
@@ -682,80 +1067,281 @@ textarea { resize: vertical; min-height: 70px; }
 </div><!-- /main -->
 </div><!-- /app -->
 
+<!-- ════════ BOTTOM NAV (mobile) ════════ -->
+<nav class="bottom-nav" id="bottom-nav">
+  <div class="bn-item active" id="bn-dashboard" onclick="nav('dashboard',null);setBottomNav('dashboard')">
+    <i class="ti ti-layout-dashboard"></i>
+    <span>Dashboard</span>
+  </div>
+  <div class="bn-item" id="bn-visitors" onclick="nav('visitors',null);setBottomNav('visitors')">
+    <i class="ti ti-users"></i>
+    <span>Visitor</span>
+    <span class="bn-badge" id="bn-badge-visitors" style="display:none">0</span>
+  </div>
+  <div class="bn-item" id="bn-checkin" onclick="openModal('modal-select-type')">
+    <div style="width:46px;height:46px;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:-4px;box-shadow:0 4px 14px rgba(37,99,235,.4)">
+      <i class="ti ti-plus" style="font-size:24px;color:#fff"></i>
+    </div>
+    <span>Check In</span>
+  </div>
+  <div class="bn-item" id="bn-realtime" onclick="nav('realtime',null);setBottomNav('realtime')">
+    <i class="ti ti-activity"></i>
+    <span>Live</span>
+  </div>
+  <div class="bn-item" id="bn-more" onclick="toggleSidebar()">
+    <i class="ti ti-menu-2"></i>
+    <span>Menu</span>
+  </div>
+</nav>
+
 
 
 <!-- ════════ MODALS ════════ -->
 
-<!-- CHECK IN MODAL -->
-<div class="modal-bg" id="modal-checkin">
+<!-- CHECK IN MODAL — GUEST -->
+<div class="modal-bg" id="modal-checkin-guest">
   <div class="modal">
     <div class="modal-title">
-      <span><i class="ti ti-user-plus" style="color:var(--blue);margin-right:8px"></i>Visitor Check In</span>
-      <button class="modal-close" onclick="closeModal('modal-checkin')"><i class="ti ti-x"></i></button>
+      <span><i class="ti ti-user" style="color:var(--blue);margin-right:8px"></i>Check In — Guest</span>
+      <button class="modal-close" onclick="closeModal('modal-checkin-guest')"><i class="ti ti-x"></i></button>
     </div>
     <div class="form-grid">
-      <div class="form-group">
-        <label>Full Name *</label>
-        <input type="text" id="ci-name" placeholder="Nama lengkap">
-      </div>
-      <div class="form-group">
-        <label>Company / Organization *</label>
-        <input type="text" id="ci-company" placeholder="PT / CV / Instansi">
-      </div>
-      <div class="form-group">
-        <label>Phone Number</label>
-        <input type="text" id="ci-phone" placeholder="08xxxxxxxxxx">
-      </div>
-      <div class="form-group">
-        <label>Identity Number (KTP/Passport)</label>
-        <input type="text" id="ci-identity" placeholder="No. identitas">
-      </div>
-      <div class="form-group full">
-        <label>Purpose of Visit *</label>
-        <select id="ci-purpose">
+      <div class="form-group"><label>Nama Lengkap *</label><input type="text" id="g-name" placeholder="Nama lengkap"></div>
+      <div class="form-group"><label>Perusahaan / Instansi *</label><input type="text" id="g-company" placeholder="PT / CV / Instansi"></div>
+      <div class="form-group"><label>No. HP</label><input type="text" id="g-phone" placeholder="08xxxxxxxxxx"></div>
+      <div class="form-group"><label>No. KTP / Passport</label><input type="text" id="g-identity" placeholder="No. identitas"></div>
+      <div class="form-group full"><label>Tujuan Kunjungan *</label>
+        <select id="g-purpose">
           <option value="">— Pilih tujuan —</option>
-          <option>Meeting / Rapat</option>
-          <option>Delivery / Pengiriman</option>
-          <option>Maintenance / Servis</option>
-          <option>Audit / Inspeksi</option>
-          <option>Training / Pelatihan</option>
-          <option>Interview</option>
-          <option>Lainnya</option>
+          <option>Meeting / Rapat</option><option>Presentasi</option><option>Kunjungan Bisnis</option><option>Lainnya</option>
         </select>
       </div>
-      <div class="form-group">
-        <label>Host / PIC *</label>
-        <input type="text" id="ci-host" placeholder="Nama pegawai yang dikunjungi">
+      <div class="form-group"><label>Host / PIC *</label><input type="text" id="g-host" placeholder="Nama pegawai yang dikunjungi"></div>
+      <div class="form-group"><label>Department</label>
+        <select id="g-dept"><option value="">— Pilih dept —</option><option>Operation</option><option>HR / HRD</option><option>Maintenance</option><option>IT</option><option>Management</option><option>HSE</option><option>Security</option></select>
       </div>
-      <div class="form-group">
-        <label>Department</label>
-        <select id="ci-dept">
-          <option value="">— Pilih dept —</option>
-          <option>Production</option>
-          <option>HR / HRD</option>
-          <option>Finance</option>
-          <option>IT</option>
-          <option>Procurement</option>
-          <option>HSE</option>
-          <option>Management</option>
-          <option>Lainnya</option>
+      <div class="form-group full"><label>Catatan</label><textarea id="g-notes" placeholder="Catatan tambahan..."></textarea></div>
+      <div class="form-group full"><label>Status Awal</label>
+        <select id="g-status"><option value="Inside">Langsung Check In (Inside)</option><option value="Waiting Approval">Waiting Approval</option></select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" onclick="closeModal('modal-checkin-guest')">Batal</button>
+      <button class="btn btn-primary" onclick="submitCheckinTyped('Guest')"><i class="ti ti-check"></i> Check In</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHECK IN MODAL — CONTRACTOR -->
+<div class="modal-bg" id="modal-checkin-contractor">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-title">
+      <span><i class="ti ti-hard-hat" style="color:var(--amber);margin-right:8px"></i>Check In — Contractor</span>
+      <button class="modal-close" onclick="closeModal('modal-checkin-contractor')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Nama Lengkap *</label><input type="text" id="con-name" placeholder="Nama lengkap"></div>
+      <div class="form-group"><label>Perusahaan Kontraktor *</label><input type="text" id="con-company" placeholder="Nama perusahaan kontraktor"></div>
+      <div class="form-group"><label>No. HP</label><input type="text" id="con-phone" placeholder="08xxxxxxxxxx"></div>
+      <div class="form-group"><label>No. KTP</label><input type="text" id="con-identity" placeholder="No. identitas"></div>
+
+      <div class="form-group"><label>Area Kerja *</label>
+        <select id="con-area">
+          <option value="">— Pilih area —</option>
+          <option>CTP-1</option><option>CTP-2</option><option>Cold Storage</option>
+          <option>Peanut</option><option>PS Drier</option><option>SPR Drier</option>
+          <option>Utility</option><option>HSE</option>
         </select>
       </div>
-      <div class="form-group full">
-        <label>Notes / Catatan</label>
-        <textarea id="ci-notes" placeholder="Catatan tambahan..."></textarea>
+      <div class="form-group"><label>Jenis Pekerjaan *</label>
+        <select id="con-purpose">
+          <option value="">— Pilih jenis —</option>
+          <option>Civil</option><option>Electric</option><option>Mechanic</option><option>HR</option>
+        </select>
       </div>
+      <div class="form-group"><label>Jumlah Personil *</label>
+        <input type="number" id="con-personil" placeholder="0" min="1" max="999"
+          oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+      </div>
+      <div class="form-group"><label>No. SPK / PO</label><input type="text" id="con-spk" placeholder="Nomor SPK atau PO"></div>
+
+      <div class="form-group"><label>Host / PIC *</label><input type="text" id="con-host" placeholder="Nama PIC internal"></div>
+      <div class="form-group"><label>Department</label>
+        <select id="con-dept"><option value="">— Pilih dept —</option><option>Operation</option><option>HR / HRD</option><option>Maintenance</option><option>IT</option><option>Management</option><option>HSE</option><option>Security</option></select>
+      </div>
+      <div class="form-group"><label>Tanggal Mulai</label><input type="date" id="con-start"></div>
+      <div class="form-group"><label>Tanggal Selesai</label><input type="date" id="con-end"></div>
+
+      <!-- PERALATAN DIBAWA -->
       <div class="form-group full">
-        <label>Status Awal</label>
-        <select id="ci-status">
+        <label>Peralatan Dibawa</label>
+        <div id="con-equipment-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+        <button type="button" class="btn btn-sm" onclick="addEquipmentRow()">
+          <i class="ti ti-plus"></i> Tambah Peralatan
+        </button>
+      </div>
+
+      <div class="form-group full"><label>Catatan</label><textarea id="con-notes" placeholder="Catatan tambahan..."></textarea></div>
+      <div class="form-group full"><label>Status Awal</label>
+        <select id="con-status">
           <option value="Inside">Langsung Check In (Inside)</option>
           <option value="Waiting Approval">Waiting Approval</option>
         </select>
       </div>
     </div>
     <div class="form-actions">
-      <button class="btn" onclick="closeModal('modal-checkin')">Batal</button>
-      <button class="btn btn-primary" onclick="submitCheckin()"><i class="ti ti-check"></i> Check In</button>
+      <button class="btn" onclick="closeModal('modal-checkin-contractor')">Batal</button>
+      <button class="btn btn-primary" onclick="submitCheckinTyped('Contractor')"><i class="ti ti-check"></i> Check In</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHECK IN MODAL — DRIVER -->
+<div class="modal-bg" id="modal-checkin-driver">
+  <div class="modal">
+    <div class="modal-title">
+      <span><i class="ti ti-truck" style="color:var(--green);margin-right:8px"></i>Check In — Driver</span>
+      <button class="modal-close" onclick="closeModal('modal-checkin-driver')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Nama Driver *</label><input type="text" id="drv-name" placeholder="Nama lengkap driver"></div>
+      <div class="form-group"><label>Perusahaan</label><input type="text" id="drv-company" placeholder="Nama perusahaan / ekspedisi"></div>
+      <div class="form-group"><label>No. HP</label><input type="text" id="drv-phone" placeholder="08xxxxxxxxxx"></div>
+      <div class="form-group"><label>No. KTP</label><input type="text" id="drv-identity" placeholder="No. identitas"></div>
+      <div class="form-group"><label>No. Polisi Kendaraan *</label><input type="text" id="drv-plate" placeholder="B 1234 XX"></div>
+      <div class="form-group"><label>Jenis Kendaraan *</label>
+        <select id="drv-vehicle">
+          <option value="">— Pilih jenis —</option>
+          <option>Truk Box</option><option>Truk Fuso</option><option>Pickup</option><option>Mobil Pribadi</option><option>Motor</option><option>Lainnya</option>
+        </select>
+      </div>
+      <div class="form-group full"><label>Muatan / Cargo</label><input type="text" id="drv-cargo" placeholder="Isi muatan kendaraan"></div>
+      <div class="form-group"><label>Tujuan *</label>
+        <select id="drv-purpose">
+          <option value="">— Pilih tujuan —</option>
+          <option>Pengiriman Barang</option><option>Pengambilan Barang</option><option>Bongkar Muat</option><option>Lainnya</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Host / PIC *</label><input type="text" id="drv-host" placeholder="Nama PIC internal"></div>
+      <div class="form-group full"><label>Catatan</label><textarea id="drv-notes" placeholder="Catatan tambahan..."></textarea></div>
+      <div class="form-group full"><label>Status Awal</label>
+        <select id="drv-status"><option value="Inside">Langsung Check In (Inside)</option><option value="Waiting Approval">Waiting Approval</option></select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" onclick="closeModal('modal-checkin-driver')">Batal</button>
+      <button class="btn btn-primary" onclick="submitCheckinTyped('Driver')"><i class="ti ti-check"></i> Check In</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHECK IN MODAL — EMPLOYEE TEST -->
+<div class="modal-bg" id="modal-checkin-employee">
+  <div class="modal">
+    <div class="modal-title">
+      <span><i class="ti ti-id-badge" style="color:var(--navy3);margin-right:8px"></i>Check In — Employee Test</span>
+      <button class="modal-close" onclick="closeModal('modal-checkin-employee')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Nama Lengkap *</label><input type="text" id="emp-name" placeholder="Nama lengkap"></div>
+      <div class="form-group"><label>NIK *</label><input type="text" id="emp-nik" placeholder="Nomor Induk Karyawan"></div>
+      <div class="form-group"><label>Dept / Divisi *</label>
+        <select id="emp-dept"><option value="">— Pilih dept —</option><option>Operation</option><option>HR / HRD</option><option>Maintenance</option><option>IT</option><option>Management</option><option>HSE</option><option>Security</option></select>
+      </div>
+      <div class="form-group"><label>Jabatan</label><input type="text" id="emp-jabatan" placeholder="Jabatan / posisi"></div>
+      <div class="form-group full"><label>Keperluan *</label>
+        <select id="emp-purpose">
+          <option value="">— Pilih keperluan —</option>
+          <option>Tes Kompetensi</option><option>Tes Kesehatan</option><option>Orientasi Karyawan Baru</option><option>Pelatihan Internal</option><option>Lainnya</option>
+        </select>
+      </div>
+      <div class="form-group"><label>PIC / Supervisor *</label><input type="text" id="emp-host" placeholder="Nama supervisor / PIC"></div>
+      <div class="form-group full"><label>Catatan</label><textarea id="emp-notes" placeholder="Catatan tambahan..."></textarea></div>
+      <div class="form-group full"><label>Status Awal</label>
+        <select id="emp-status"><option value="Inside">Langsung Check In (Inside)</option><option value="Waiting Approval">Waiting Approval</option></select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" onclick="closeModal('modal-checkin-employee')">Batal</button>
+      <button class="btn btn-primary" onclick="submitCheckinTyped('Employee Test')"><i class="ti ti-check"></i> Check In</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHECK IN MODAL — AUDITOR -->
+<div class="modal-bg" id="modal-checkin-auditor">
+  <div class="modal">
+    <div class="modal-title">
+      <span><i class="ti ti-clipboard-check" style="color:var(--red);margin-right:8px"></i>Check In — Auditor</span>
+      <button class="modal-close" onclick="closeModal('modal-checkin-auditor')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Nama Lengkap *</label><input type="text" id="aud-name" placeholder="Nama lengkap"></div>
+      <div class="form-group"><label>Instansi / Lembaga *</label><input type="text" id="aud-company" placeholder="Nama instansi / lembaga audit"></div>
+      <div class="form-group"><label>No. HP</label><input type="text" id="aud-phone" placeholder="08xxxxxxxxxx"></div>
+      <div class="form-group"><label>No. KTP</label><input type="text" id="aud-identity" placeholder="No. identitas"></div>
+      <div class="form-group"><label>Jenis Audit *</label>
+        <select id="aud-audittype">
+          <option value="">— Pilih jenis audit —</option>
+          <option>Audit Internal</option><option>Audit Eksternal</option><option>Audit ISO</option><option>Audit Pemerintah</option><option>Audit Pelanggan</option><option>Lainnya</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Scope Audit</label><input type="text" id="aud-scope" placeholder="Ruang lingkup audit"></div>
+      <div class="form-group"><label>Host / PIC *</label><input type="text" id="aud-host" placeholder="Nama PIC internal"></div>
+      <div class="form-group"><label>Department</label>
+        <select id="aud-dept"><option value="">— Pilih dept —</option><option>Operation</option><option>HR / HRD</option><option>Maintenance</option><option>IT</option><option>Management</option><option>HSE</option><option>Security</option></select>
+      </div>
+      <div class="form-group full"><label>No. Surat Tugas</label><input type="text" id="aud-surat" placeholder="Nomor surat tugas / assignment letter"></div>
+      <div class="form-group full"><label>Catatan</label><textarea id="aud-notes" placeholder="Catatan tambahan..."></textarea></div>
+      <div class="form-group full"><label>Status Awal</label>
+        <select id="aud-status"><option value="Inside">Langsung Check In (Inside)</option><option value="Waiting Approval">Waiting Approval</option></select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" onclick="closeModal('modal-checkin-auditor')">Batal</button>
+      <button class="btn btn-primary" onclick="submitCheckinTyped('Auditor')"><i class="ti ti-check"></i> Check In</button>
+    </div>
+  </div>
+</div>
+<!-- DRIVER APPROVAL MODAL -->
+<div class="modal-bg" id="modal-driver-approval">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-title">
+      <span><i class="ti ti-truck" style="color:var(--green);margin-right:8px"></i>Driver — Approval Keluar</span>
+      <button class="modal-close" onclick="closeModal('modal-driver-approval')"><i class="ti ti-x"></i></button>
+    </div>
+    <div id="driver-approval-content"></div>
+    <div class="form-actions" id="driver-approval-actions"></div>
+  </div>
+</div>
+<!-- MODAL PILIH TIPE CHECK IN -->
+<div class="modal-bg" id="modal-select-type">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title">
+      <span><i class="ti ti-user-plus" style="color:var(--blue);margin-right:8px"></i>Pilih Tipe Pengunjung</span>
+      <button class="modal-close" onclick="closeModal('modal-select-type')"><i class="ti ti-x"></i></button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-bottom:8px">
+      <button class="btn" style="flex-direction:column;padding:16px;gap:6px;height:auto" onclick="closeModal('modal-select-type');openModal('modal-checkin-guest')">
+        <i class="ti ti-user" style="font-size:24px;color:var(--blue)"></i>
+        <span style="font-size:13px;font-weight:600">Guest</span>
+      </button>
+      <button class="btn" style="flex-direction:column;padding:16px;gap:6px;height:auto" onclick="closeModal('modal-select-type');openModal('modal-checkin-contractor')">
+        <i class="ti ti-hard-hat" style="font-size:24px;color:var(--amber)"></i>
+        <span style="font-size:13px;font-weight:600">Contractor</span>
+      </button>
+      <button class="btn" style="flex-direction:column;padding:16px;gap:6px;height:auto" onclick="closeModal('modal-select-type');openModal('modal-checkin-driver')">
+        <i class="ti ti-truck" style="font-size:24px;color:var(--green)"></i>
+        <span style="font-size:13px;font-weight:600">Driver</span>
+      </button>
+      <button class="btn" style="flex-direction:column;padding:16px;gap:6px;height:auto" onclick="closeModal('modal-select-type');openModal('modal-checkin-employee')">
+        <i class="ti ti-id-badge" style="font-size:24px;color:var(--navy3)"></i>
+        <span style="font-size:13px;font-weight:600">Employee Test</span>
+      </button>
+      <button class="btn" style="grid-column:1/-1;flex-direction:column;padding:16px;gap:6px;height:auto" onclick="closeModal('modal-select-type');openModal('modal-checkin-auditor')">
+        <i class="ti ti-clipboard-check" style="font-size:24px;color:var(--red)"></i>
+        <span style="font-size:13px;font-weight:600">Auditor</span>
+      </button>
     </div>
   </div>
 </div>
@@ -828,6 +1414,46 @@ textarea { resize: vertical; min-height: 70px; }
 <div id="toast-container"></div>
 
 <style>
+/* ── EQUIPMENT ROW ── */
+.equip-row {
+  display: grid; grid-template-columns: 1fr 72px 36px;
+  gap: 8px; align-items: center;
+}
+.equip-row input { margin: 0; }
+.btn-remove-equip {
+  width: 36px; height: 36px; border-radius: var(--radius-sm);
+  background: var(--red-light); border: 1px solid var(--red-light);
+  color: var(--red); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 15px; flex-shrink: 0; transition: background .14s;
+}
+.btn-remove-equip:hover { background: var(--red); color: #fff; }
+
+/* ── SLA BADGE ── */
+.sla-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 700;
+  font-family: 'DM Mono', monospace;
+}
+.sla-ok   { background: var(--green-light); color: var(--green-text); }
+.sla-warn { background: var(--amber-light); color: var(--amber-text); }
+.sla-over { background: var(--red-light);   color: var(--red-text); }
+
+/* ── DRIVER APPROVAL STEP ── */
+.approval-step {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px; border-radius: var(--radius);
+  border: 1.5px solid var(--border); margin-bottom: 10px;
+}
+.approval-step-icon {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 18px;
+}
+.step-done { background: var(--green-light); color: var(--green); }
+.step-pend { background: var(--amber-light); color: var(--amber); }
+.step-lock { background: var(--gray-light);  color: var(--gray); }
+
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 </style>
 
@@ -837,7 +1463,7 @@ textarea { resize: vertical; min-height: 70px; }
 // ══════════════════════════════════════════
  
 // Ganti dengan URL Web App hasil Deploy di Google Apps Script
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbwDzA7usXOG-SPNbeKCJSEZjuC40uSSAD8WMH2xGB0aZhwPl-TqkkJdv5VEoQdNH1xc/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbykfv9j6MHlGZK2chWzIE97KL38cVC7JoEdIl8dJXaIQXHusmVSkq40iAVM0ZPW3awq/exec';
  
 async function sendToGAS(action, data) {
   if (!GAS_URL) return { ok: false };
@@ -1035,32 +1661,37 @@ const pageTitles = {
 };
 
 let currentPage = 'dashboard';
+let currentVisitorType = 'all';
+let sidebarOpen = false;
 
-function nav(page, el) {
-  // hide all pages
-  document.querySelectorAll('[id^="page-"]').forEach(p => p.style.display = 'none');
-  document.getElementById('page-' + page).style.display = '';
-  // update sidebar
-  document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
-  if (el) el.classList.add('active');
-  // update topbar
-  const [title, sub] = pageTitles[page] || [page, ''];
-  document.getElementById('page-title').textContent = title;
-  document.getElementById('page-sub').textContent = sub;
-  currentPage = page;
-  // update topbar actions
-  const ta = document.getElementById('topbar-actions');
-  ta.innerHTML = '';
-  if (page === 'dashboard' || page === 'visitors') {
-    ta.innerHTML = '<button class="btn btn-primary" onclick="openModal(\'modal-checkin\')"><i class="ti ti-user-plus"></i> Check In Visitor</button>';
-  } else if (page === 'equipment') {
-    ta.innerHTML = '<button class="btn btn-primary" onclick="openModal(\'modal-equipment\')"><i class="ti ti-plus"></i> Add Equipment</button>';
-  } else if (page === 'emergency') {
-    ta.innerHTML = '<button class="btn btn-danger" onclick="exportEmergency()"><i class="ti ti-download"></i> Export Muster Report</button>';
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sb-overlay');
+  const main = document.querySelector('.main');
+
+  sidebar.classList.toggle('open', sidebarOpen);
+  overlay.classList.toggle('show', sidebarOpen);
+
+  const isMobile = window.innerWidth <= 768;
+  if (!isMobile) {
+    main.classList.toggle('pushed', sidebarOpen);
+  } else {
+    main.classList.remove('pushed');
+    document.body.style.overflow = sidebarOpen ? 'hidden' : '';
   }
-  // render page
-  renderPage(page);
+
+  const toggleBtn = document.getElementById('sb-toggle');
+  if (toggleBtn) toggleBtn.classList.toggle('open', sidebarOpen);
+  const toggleIcon = document.getElementById('sb-toggle-icon');
+  if (toggleIcon) toggleIcon.className = sidebarOpen ? 'ti ti-x' : 'ti ti-menu-2';
+
+  if (sidebarOpen) {
+    history.pushState({ sidebarOpen: true, page: currentPage }, '', '#sidebar');
+  }
 }
+
+// nav() didefinisikan ulang di bagian bawah via History API section
 
 function renderPage(page) {
   if (page === 'dashboard') renderDashboard();
@@ -1112,6 +1743,14 @@ function renderDashboard() {
   document.getElementById('stat-equip').textContent = equipInside;
   document.getElementById('stat-overstay').textContent = overstay;
   document.getElementById('stat-today').textContent = todayV;
+
+  // per type stats
+  const activeV = visitors.filter(v => v.status === 'Inside' || v.status === 'Overstay');
+  document.getElementById('stat-guest').textContent = activeV.filter(v => v.visitorType === 'Guest').length;
+  document.getElementById('stat-contractor').textContent = activeV.filter(v => v.visitorType === 'Contractor').length;
+  document.getElementById('stat-driver').textContent = activeV.filter(v => v.visitorType === 'Driver').length;
+  document.getElementById('stat-employee').textContent = activeV.filter(v => v.visitorType === 'Employee Test').length;
+  document.getElementById('stat-auditor').textContent = activeV.filter(v => v.visitorType === 'Auditor').length;
 
   // update sidebar badge
   document.getElementById('badge-visitors').textContent = inside;
@@ -1186,23 +1825,55 @@ function statusPill(status) {
 // ══════════════════════════════════════════
 //  VISITOR TABLE
 // ══════════════════════════════════════════
+function typePill(type) {
+  const map = {
+    'Guest': ['pill-pending', 'ti-user'],
+    'Contractor': ['pill-waiting', 'ti-hard-hat'],
+    'Driver': ['pill-good', 'ti-truck'],
+    'Employee Test': ['pill-out', 'ti-id-badge'],
+    'Auditor': ['pill-overstay', 'ti-clipboard-check'],
+  };
+  const [cls, icon] = map[type] || ['pill-out', 'ti-user'];
+  return `<span class="pill ${cls}"><i class="ti ${icon}" style="font-size:10px"></i> ${type || '—'}</span>`;
+}
+
+function switchVisitorType(type, el) {
+  currentVisitorType = type;
+  document.querySelectorAll('#visitor-type-tabs .type-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderVisitorTable();
+}
+
+function updateTypeCounts() {
+  const visitors = DB.visitors();
+  const types = ['guest','contractor','driver','employee','auditor'];
+  const typeNames = ['Guest','Contractor','Driver','Employee Test','Auditor'];
+  document.getElementById('tc-all').textContent = visitors.length;
+  types.forEach((t,i) => {
+    const el = document.getElementById('tc-'+t);
+    if (el) el.textContent = visitors.filter(v => v.visitorType === typeNames[i]).length;
+  });
+}
+
 function renderVisitorTable() {
   let visitors = DB.visitors();
   const q = (document.getElementById('visitor-search')?.value || '').toLowerCase();
   const statusFilter = document.getElementById('visitor-filter-status')?.value || '';
   const tabFilter = tabFilters['visitors'] || 'all';
 
-  if (q) visitors = visitors.filter(v => v.name.toLowerCase().includes(q) || v.company.toLowerCase().includes(q) || v.host.toLowerCase().includes(q));
+  if (currentVisitorType !== 'all') visitors = visitors.filter(v => v.visitorType === currentVisitorType);
+  if (q) visitors = visitors.filter(v => (v.name||'').toLowerCase().includes(q) || (v.company||'').toLowerCase().includes(q) || (v.host||'').toLowerCase().includes(q));
   if (statusFilter) visitors = visitors.filter(v => v.status === statusFilter);
   if (tabFilter === 'inside') visitors = visitors.filter(v => v.status === 'Inside' || v.status === 'Overstay');
   if (tabFilter === 'today') visitors = visitors.filter(v => isToday(v.checkIn));
   if (tabFilter === 'out') visitors = visitors.filter(v => v.status === 'Checked Out');
 
-  // sort: active first
   visitors.sort((a,b) => {
     const order = { 'Overstay':0,'Inside':1,'Waiting Approval':2,'Checked Out':3 };
     return (order[a.status] ?? 99) - (order[b.status] ?? 99);
   });
+
+  updateTypeCounts();
 
   const tbody = document.getElementById('visitor-table');
   if (!tbody) return;
@@ -1217,22 +1888,196 @@ function renderVisitorTable() {
         <div class="td-main">${v.name}</div>
         <div class="td-sub mono">${v.id}</div>
       </td>
-      <td>${v.company}<div class="td-sub">${v.phone || ''}</div></td>
+      <td>${typePill(v.visitorType)}</td>
+      <td>${v.company || '—'}<div class="td-sub">${v.phone || ''}</div></td>
       <td>${v.host}<div class="td-sub">${v.dept || ''}</div></td>
-      <td>${v.purpose}</td>
       <td class="mono">${fmtDateTime(v.checkIn)}</td>
-      <td><span class="timer ${durationSecs(v.checkIn, v.checkOut) > 14400 && v.status !== 'Checked Out' ? 'danger' : ''}" ${v.status !== 'Checked Out' ? `data-checkin="${v.checkIn}" data-status="${v.status}"` : ''}>${fmtDuration(v.checkIn, v.checkOut)}</span></td>
+      <td>
+        ${v.visitorType === 'Contractor'
+          ? getSLADisplay(v.slaStart)
+          : v.status === 'Waiting Approval'
+            ? '<span style="font-size:12px;color:var(--text3)">— Menunggu —</span>'
+            : `<span class="timer ${durationSecs(v.checkIn, v.checkOut) > 14400 && v.status !== 'Checked Out' ? 'danger' : ''}"
+                ${v.status !== 'Checked Out' ? `data-checkin="${v.checkIn}" data-status="${v.status}"` : ''}>
+                ${fmtDuration(v.checkIn, v.checkOut)}</span>`
+        }
+      </td>
       <td>${statusPill(v.status)}</td>
       <td>
         <div class="flex-gap8">
           <button class="btn btn-sm" onclick="openDetail('${v.id}')"><i class="ti ti-eye"></i></button>
-          ${v.status === 'Waiting Approval' ? `<button class="btn btn-sm btn-primary" onclick="approveVisitor('${v.id}')"><i class="ti ti-check"></i> Approve</button>` : ''}
-          ${v.status !== 'Checked Out' ? `<button class="btn btn-sm btn-success" onclick="doCheckout('${v.id}')"><i class="ti ti-logout"></i></button>` : ''}
+          ${v.visitorType === 'Driver' && v.status !== 'Checked Out'
+            ? `<button class="btn btn-sm btn-primary" onclick="openDriverApproval('${v.id}')"><i class="ti ti-truck"></i> Approval</button>`
+            : `${v.status === 'Waiting Approval' ? `<button class="btn btn-sm btn-primary" onclick="approveVisitor('${v.id}')"><i class="ti ti-check"></i></button>` : ''}
+               ${v.status !== 'Checked Out' ? `<button class="btn btn-sm btn-success" onclick="doCheckout('${v.id}')"><i class="ti ti-logout"></i></button>` : ''}`
+          }
           <button class="btn btn-sm btn-danger" onclick="deleteVisitor('${v.id}')"><i class="ti ti-trash"></i></button>
         </div>
       </td>
     </tr>
   `).join('');
+}
+
+function openCheckinByType() {
+  const typeMap = {
+    'Guest': 'modal-checkin-guest',
+    'Contractor': 'modal-checkin-contractor',
+    'Driver': 'modal-checkin-driver',
+    'Employee Test': 'modal-checkin-employee',
+    'Auditor': 'modal-checkin-auditor',
+  };
+  if (currentVisitorType !== 'all' && typeMap[currentVisitorType]) {
+    openModal(typeMap[currentVisitorType]);
+  } else {
+    openModal('modal-select-type');
+  }
+}
+
+// ── EQUIPMENT ROW (Contractor) ────────────────────────────
+function addEquipmentRow() {
+  const list = document.getElementById('con-equipment-list');
+  const row = document.createElement('div');
+  row.className = 'equip-row';
+  row.innerHTML = `
+    <input type="text" class="eq-nama" placeholder="Nama peralatan">
+    <input type="number" class="eq-qty" placeholder="Qty" min="1"
+      oninput="this.value=this.value.replace(/[^0-9]/g,'')" style="text-align:center">
+    <button type="button" class="btn-remove-equip" onclick="this.closest('.equip-row').remove()">
+      <i class="ti ti-x"></i>
+    </button>
+  `;
+  list.appendChild(row);
+  row.querySelector('.eq-nama').focus();
+}
+
+// ── SLA HELPERS ───────────────────────────────────────────
+function getSLADisplay(slaStart) {
+  if (!slaStart) return '<span class="sla-badge sla-warn"><i class="ti ti-clock"></i> Menunggu Approval</span>';
+  const secs = durationSecs(slaStart);
+  const label = fmtDuration(slaStart);
+  if (secs < 8 * 3600)  return `<span class="sla-badge sla-ok"><i class="ti ti-clock"></i> ${label}</span>`;
+  if (secs < 12 * 3600) return `<span class="sla-badge sla-warn"><i class="ti ti-alert-triangle"></i> ${label}</span>`;
+  return `<span class="sla-badge sla-over"><i class="ti ti-alert-circle"></i> ${label}</span>`;
+}
+
+// ── DRIVER APPROVAL SYSTEM ────────────────────────────────
+function openDriverApproval(id) {
+  const v = DB.visitors().find(x => x.id === id);
+  if (!v) return;
+
+  const gatePassExists = !!v.gatePassOut;
+  const isApproved     = v.driverApproved;
+
+  const content = document.getElementById('driver-approval-content');
+  content.innerHTML = `
+    <div style="margin-bottom:16px">
+      <div style="font-weight:600;font-size:15px">${v.name}</div>
+      <div style="font-size:12px;color:var(--text3)">${v.company || '—'} · ${v.plate || '—'} · ${v.vehicle || '—'}</div>
+      <div style="margin-top:6px;font-size:12px;color:var(--text3)">Muatan: ${v.cargo || '—'}</div>
+      <div style="margin-top:4px">${statusPill(v.status)}</div>
+    </div>
+
+    <div class="approval-step">
+      <div class="approval-step-icon step-done"><i class="ti ti-login"></i></div>
+      <div>
+        <div style="font-weight:500;font-size:13px">Check In</div>
+        <div style="font-size:12px;color:var(--text3)">Masuk: ${fmtDateTime(v.checkIn)}</div>
+      </div>
+    </div>
+
+    <div class="approval-step">
+      <div class="approval-step-icon ${isApproved ? 'step-done' : 'step-pend'}">
+        <i class="ti ${isApproved ? 'ti-check' : 'ti-clock'}"></i>
+      </div>
+      <div>
+        <div style="font-weight:500;font-size:13px">Approval Keluar</div>
+        <div style="font-size:12px;color:var(--text3)">
+          ${isApproved ? `Disetujui: ${fmtDateTime(v.approvedAt)}` : 'Menunggu persetujuan security/admin'}
+        </div>
+      </div>
+    </div>
+
+    <div class="approval-step">
+      <div class="approval-step-icon ${gatePassExists ? 'step-done' : 'step-lock'}">
+        <i class="ti ${gatePassExists ? 'ti-file-check' : 'ti-lock'}"></i>
+      </div>
+      <div>
+        <div style="font-weight:500;font-size:13px">Gate Pass Keluar</div>
+        <div style="font-size:12px;color:var(--text3)">
+          ${gatePassExists ? `No: <strong>${v.gatePassOut}</strong>` : 'Terkunci — butuh approval terlebih dahulu'}
+        </div>
+      </div>
+    </div>
+
+    <div class="approval-step">
+      <div class="approval-step-icon ${v.status === 'Checked Out' ? 'step-done' : 'step-lock'}">
+        <i class="ti ${v.status === 'Checked Out' ? 'ti-logout' : 'ti-lock'}"></i>
+      </div>
+      <div>
+        <div style="font-weight:500;font-size:13px">Check Out</div>
+        <div style="font-size:12px;color:var(--text3)">
+          ${v.status === 'Checked Out' ? fmtDateTime(v.checkOut) : 'Terkunci — selesaikan step di atas'}
+        </div>
+      </div>
+    </div>
+  `;
+
+  const actions = document.getElementById('driver-approval-actions');
+  actions.innerHTML = `<button class="btn" onclick="closeModal('modal-driver-approval')">Tutup</button>`;
+
+  if (!isApproved && v.status !== 'Checked Out') {
+    actions.innerHTML += `
+      <button class="btn btn-primary" onclick="approveDriverOut('${v.id}')">
+        <i class="ti ti-check"></i> Approve Keluar
+      </button>`;
+  }
+  if (isApproved && !gatePassExists && v.status !== 'Checked Out') {
+    actions.innerHTML += `
+      <button class="btn btn-success" onclick="generateDriverGatePass('${v.id}')">
+        <i class="ti ti-file-plus"></i> Generate Gate Pass
+      </button>`;
+  }
+  if (gatePassExists && v.status !== 'Checked Out') {
+    actions.innerHTML += `
+      <button class="btn btn-success" onclick="doCheckout('${v.id}'); closeModal('modal-driver-approval')">
+        <i class="ti ti-logout"></i> Check Out
+      </button>`;
+  }
+
+  openModal('modal-driver-approval');
+}
+
+function approveDriverOut(id) {
+  const visitors = DB.visitors();
+  const v = visitors.find(x => x.id === id);
+  if (!v) return;
+  v.driverApproved = true;
+  v.approvedAt = now();
+  DB.setVisitors(visitors);
+  addAudit('APPROVE_OUT', 'DRIVER', v.name + ' — disetujui keluar');
+  sendLogToGAS('APPROVE_OUT', 'DRIVER', v.name + ' — disetujui keluar');
+  toast(v.name + ' disetujui keluar — silakan generate Gate Pass', 'success');
+  openDriverApproval(id); // refresh modal
+}
+
+function generateDriverGatePass(id) {
+  const visitors = DB.visitors();
+  const v = visitors.find(x => x.id === id);
+  if (!v) return;
+  if (!v.driverApproved) { toast('Driver belum mendapat approval keluar', 'error'); return; }
+
+  // Generate gate pass number
+  const d = new Date();
+  const ds = d.getFullYear().toString() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+  const existing = DB.visitors().filter(x => x.gatePassOut && x.gatePassOut.startsWith('GPD-'+ds));
+  const num = String(existing.length + 1).padStart(3,'0');
+  v.gatePassOut = 'GPD-' + ds + '-' + num;
+
+  DB.setVisitors(visitors);
+  addAudit('GATE_PASS', 'DRIVER', v.name + ' — ' + v.gatePassOut);
+  sendLogToGAS('GATE_PASS', 'DRIVER', v.name + ' — ' + v.gatePassOut);
+  toast('Gate Pass ' + v.gatePassOut + ' berhasil dibuat', 'success');
+  openDriverApproval(id); // refresh modal
 }
 
 // ══════════════════════════════════════════
@@ -1626,45 +2471,86 @@ function clearAudit() {
 // ══════════════════════════════════════════
 //  ACTIONS
 // ══════════════════════════════════════════
-async function submitCheckin() {
-  const name = document.getElementById('ci-name').value.trim();
-  const company = document.getElementById('ci-company').value.trim();
-  const purpose = document.getElementById('ci-purpose').value;
-  const host = document.getElementById('ci-host').value.trim();
-  if (!name || !company || !purpose || !host) { toast('Lengkapi field yang wajib diisi (*)', 'error'); return; }
- 
-  const v = {
+function submitCheckinTyped(type) {
+  const prefix = { 'Guest':'g', 'Contractor':'con', 'Driver':'drv', 'Employee Test':'emp', 'Auditor':'aud' }[type];
+  const modalId = { 'Guest':'modal-checkin-guest', 'Contractor':'modal-checkin-contractor', 'Driver':'modal-checkin-driver', 'Employee Test':'modal-checkin-employee', 'Auditor':'modal-checkin-auditor' }[type];
+
+  const get = (id) => document.getElementById(prefix+'-'+id)?.value?.trim() || '';
+
+  const name = get('name');
+  const host = get('host');
+  const purpose = get('purpose');
+
+  if (!name || !host || !purpose) { toast('Lengkapi field yang wajib diisi (*)', 'error'); return; }
+  if (type === 'Contractor') {
+    const area = document.getElementById('con-area')?.value;
+    const personil = document.getElementById('con-personil')?.value;
+    if (!area) { toast('Pilih Area Kerja', 'error'); return; }
+    if (!personil || parseInt(personil) < 1) { toast('Isi Jumlah Personil (angka)', 'error'); return; }
+  }
+
+  const base = {
     id: genId('VIS'),
-    name, company,
-    phone: document.getElementById('ci-phone').value.trim(),
-    identity: document.getElementById('ci-identity').value.trim(),
-    purpose,
+    visitorType: type,
+    name,
     host,
-    dept: document.getElementById('ci-dept').value,
-    notes: document.getElementById('ci-notes').value.trim(),
-    status: document.getElementById('ci-status').value,
-    checkIn: now(),
-    checkOut: null,
-    createdAt: now(),
+    purpose,
+    status: get('status') || 'Inside',
+    checkIn: now(), checkOut: null, createdAt: now(),
     user: document.getElementById('sb-uname').textContent,
   };
- 
+
+  // field per tipe
+  if (type === 'Guest') {
+    Object.assign(base, { company: get('company'), phone: get('phone'), identity: get('identity'), dept: document.getElementById('g-dept').value, notes: get('notes') });
+  } else if (type === 'Contractor') {
+    const equipRows = [];
+    document.querySelectorAll('#con-equipment-list .equip-row').forEach(row => {
+      const nama = row.querySelector('.eq-nama')?.value?.trim();
+      const qty  = row.querySelector('.eq-qty')?.value?.trim();
+      if (nama) equipRows.push({ nama, qty: qty || '1' });
+    });
+    const conStatus = document.getElementById('con-status').value;
+    Object.assign(base, {
+      company:    get('company'),
+      phone:      get('phone'),
+      identity:   get('identity'),
+      dept:       document.getElementById('con-dept').value,
+      notes:      get('notes'),
+      spk:        get('spk'),
+      startDate:  get('start'),
+      endDate:    get('end'),
+      area:       document.getElementById('con-area').value,
+      personil:   get('personil'),
+      equipList:  equipRows,
+      slaStart:   conStatus === 'Inside' ? base.checkIn : null,
+    });
+    base.status = conStatus;
+    if (!base.area) { toast('Pilih Area Kerja', 'error'); return; }
+    if (!base.personil || parseInt(base.personil) < 1) { toast('Isi Jumlah Personil', 'error'); return; }
+  } else if (type === 'Driver') {
+    Object.assign(base, { company: get('company'), phone: get('phone'), identity: get('identity'), plate: get('plate'), vehicle: document.getElementById('drv-vehicle').value, cargo: get('cargo'), notes: get('notes') });
+  } else if (type === 'Employee Test') {
+    Object.assign(base, { company: '—', nik: get('nik'), dept: document.getElementById('emp-dept').value, jabatan: get('jabatan'), notes: get('notes') });
+  } else if (type === 'Auditor') {
+    Object.assign(base, { company: get('company'), phone: get('phone'), identity: get('identity'), auditType: document.getElementById('aud-audittype').value, scope: get('scope'), dept: document.getElementById('aud-dept').value, suratTugas: get('surat'), notes: get('notes') });
+  }
+
   const visitors = DB.visitors();
-  visitors.unshift(v);
+  visitors.unshift(base);
   DB.setVisitors(visitors);
-  addAudit('CHECK_IN', 'VISITOR', `${name} dari ${company} — ${purpose}`);
-  closeModal('modal-checkin');
-  toast(name + ' berhasil check in!', 'success');
-  // reset form
-  ['ci-name','ci-company','ci-phone','ci-identity','ci-host','ci-notes'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('ci-purpose').value = '';
-  document.getElementById('ci-dept').value = '';
+  addAudit('CHECK_IN', 'VISITOR', `[${type}] ${name} — ${purpose}`);
+  closeModal(modalId);
+  toast(`${name} (${type}) berhasil check in!`, 'success');
+
+  // reset field
+  document.querySelectorAll(`#${modalId} input, #${modalId} textarea`).forEach(el => el.value = '');
+  document.querySelectorAll(`#${modalId} select`).forEach(el => el.selectedIndex = 0);
+
   checkAlerts();
   renderPage(currentPage);
- 
-  // Kirim ke Google Sheets (async, tidak memblokir UI)
-  sendToGAS('CHECKIN_VISITOR', v);
-  sendLogToGAS('CHECK_IN', 'VISITOR', `${name} dari ${company} — ${purpose}`);
+  sendToGAS('CHECKIN_VISITOR', base);
+  sendLogToGAS('CHECK_IN', 'VISITOR', `[${type}] ${name} — ${purpose}`);
 }
 
 
@@ -1697,6 +2583,10 @@ function approveVisitor(id) {
   const v = visitors.find(x => x.id === id);
   if (!v) return;
   v.status = 'Inside';
+  // SLA Contractor mulai saat approval
+  if (v.visitorType === 'Contractor' && !v.slaStart) {
+    v.slaStart = now();
+  }
   DB.setVisitors(visitors);
   addAudit('UPDATE', 'VISITOR', v.name + ' — status diubah ke Inside');
   toast(v.name + ' disetujui masuk', 'success');
@@ -2020,21 +2910,63 @@ async function loadFromGAS() {
 
     if (dataV.rows && dataV.rows.length > 0) {
       const visitors = dataV.rows.map(r => ({
-        id: r[0], name: r[1], company: r[2],
-        phone: r[3], identity: r[4], purpose: r[5],
-        host: r[6], dept: r[7], notes: r[8],
-        status: r[9], checkIn: r[10], checkOut: r[11] || null,
-        createdAt: r[14],
+        // Common
+        id:           r[0],
+        visitorType:  r[1] || 'Guest',
+        name:         r[2],
+        company:      r[3],
+        phone:        r[4],
+        identity:     r[5],
+        purpose:      r[6],
+        host:         r[7],
+        dept:         r[8],
+        notes:        r[9],
+        status:       r[10],
+        checkIn:      r[11],
+        checkOut:     r[12] || null,
+        // duration r[13] — tidak perlu, dihitung live
+        // Contractor
+        area:         r[14],
+        // purpose sudah di r[6], r[15] = Jenis Pekerjaan (sama)
+        personil:     r[16],
+        spk:          r[17],
+        startDate:    r[18],
+        endDate:      r[19],
+        equipList:    r[20] ? r[20].split(';').map(s => { const p = s.trim().match(/^(.+)\((\d+)\)$/); return p ? { nama: p[1].trim(), qty: p[2] } : { nama: s.trim(), qty: '1' }; }) : [],
+        slaStart:     r[21] || null,
+        // r[22] SLA Duration
+        // Driver
+        plate:        r[23],
+        vehicle:      r[24],
+        cargo:        r[25],
+        driverApproved: r[26] === 'TRUE',
+        approvedAt:   r[27] || null,
+        gatePassOut:  r[28] || null,
+        // Employee Test
+        nik:          r[29],
+        jabatan:      r[30],
+        // Auditor
+        auditType:    r[31],
+        scope:        r[32],
+        suratTugas:   r[33],
+        // Meta
+        createdAt:    r[34],
       })).filter(v => v.id && v.name);
       if (visitors.length > 0) DB.setVisitors(visitors);
     }
 
     if (dataE.rows && dataE.rows.length > 0) {
       const equipment = dataE.rows.map(r => ({
-        id: r[0], name: r[1], serial: r[2],
-        owner: r[3], gatePass: r[4], condition: r[5],
-        status: r[6], notes: r[7], dateIn: r[8],
-        dateOut: r[9] || null,
+        id:        r[0],
+        name:      r[1],
+        serial:    r[2],
+        owner:     r[3],
+        gatePass:  r[4],
+        condition: r[5],
+        status:    r[6],
+        notes:     r[7],
+        dateIn:    r[8],
+        dateOut:   r[9] || null,
       })).filter(e => e.id && e.name);
       if (equipment.length > 0) DB.setEquipment(equipment);
     }
@@ -2049,6 +2981,81 @@ async function loadFromGAS() {
   checkAlerts();
 }
 
+// ══════════════════════════════════════════
+//  BOTTOM NAV SYNC
+// ══════════════════════════════════════════
+const bottomNavPages = ['dashboard','visitors','realtime'];
+
+function setBottomNav(page) {
+  document.querySelectorAll('.bn-item').forEach(el => el.classList.remove('active'));
+  const target = document.getElementById('bn-' + page);
+  if (target) target.classList.add('active');
+  // update visitor badge on bottom nav
+  const inside = DB.visitors().filter(v => v.status === 'Inside' || v.status === 'Overstay').length;
+  const bnBadge = document.getElementById('bn-badge-visitors');
+  if (bnBadge) {
+    bnBadge.textContent = inside;
+    bnBadge.style.display = inside > 0 ? '' : 'none';
+  }
+}
+
+// ══════════════════════════════════════════
+//  HISTORY API — Back swipe support
+// ══════════════════════════════════════════
+// ══════════════════════════════════════════
+//  HISTORY API — Back swipe support
+// ══════════════════════════════════════════
+
+// Override nav langsung — tidak pakai _origNav untuk menghindari infinite loop
+const _navCore = function(page, el) {
+  if (sidebarOpen) toggleSidebar();
+  document.querySelectorAll('[id^="page-"]').forEach(p => p.style.display = 'none');
+  document.getElementById('page-' + page).style.display = '';
+  document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
+  if (el) el.classList.add('active');
+  const [title, sub] = pageTitles[page] || [page, ''];
+  document.getElementById('page-title').textContent = title;
+  document.getElementById('page-sub').textContent = sub;
+  currentPage = page;
+  const ta = document.getElementById('topbar-actions');
+  ta.innerHTML = '';
+  if (page === 'equipment') {
+    ta.innerHTML = '<button class="btn btn-primary" onclick="openModal(\'modal-equipment\')"><i class="ti ti-plus"></i> Add Equipment</button>';
+  } else if (page === 'emergency') {
+    ta.innerHTML = '<button class="btn btn-danger" onclick="exportEmergency()"><i class="ti ti-download"></i> Export Muster Report</button>';
+  }
+  renderPage(page);
+  setBottomNav(page);
+};
+
+// Ganti fungsi nav global
+nav = function(page, el) {
+  if (page !== currentPage) {
+    history.pushState({ page }, '', '#' + page);
+  }
+  _navCore(page, el);
+};
+
+// Handle back gesture browser/OS
+window.addEventListener('popstate', function(e) {
+  if (sidebarOpen) {
+    sidebarOpen = false;
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sb-overlay').classList.remove('show');
+    document.querySelector('.main').classList.remove('pushed');
+    document.body.style.overflow = '';
+    return;
+  }
+  const page = (e.state && e.state.page) ? e.state.page : 'dashboard';
+  _navCore(page, null);
+});
+
+// Set initial history state
+history.replaceState({ page: 'dashboard' }, '', '#dashboard');
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
 loadFromGAS();
 addAudit('LOGIN', 'SYSTEM', 'Prasad Seeds P2 — Security Officer — login');
 </script>
