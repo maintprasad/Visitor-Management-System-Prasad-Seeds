@@ -1,3062 +1,1054 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
+    <link rel="icon" href="data:,">
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1829">
-<title>Visitor System Management</title>
+<title>Visitor Checkout — Prasad Seeds</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.6.0/dist/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <style>
 :root {
-  --navy: #0f1829;
-  --navy2: #1a2540;
-  --navy3: #243058;
-  --blue: #2563eb;
-  --blue-light: #dbeafe;
-  --blue-text: #1e40af;
-  --green: #16a34a;
-  --green-light: #dcfce7;
-  --green-text: #15803d;
-  --red: #dc2626;
-  --red-light: #fee2e2;
-  --red-text: #b91c1c;
-  --amber: #d97706;
-  --amber-light: #fef3c7;
-  --amber-text: #b45309;
-  --gray: #6b7280;
-  --gray-light: #f3f4f6;
+  --navy:   #0f1829;
+  --navy2:  #1a2540;
+  --navy3:  #243058;
+  --blue:   #2563eb;
+  --blue-d: #1d4ed8;
+  --blue-l: #dbeafe;
+  --green:  #16a34a;
+  --green-d:#15803d;
+  --green-l:#dcfce7;
+  --red:    #dc2626;
+  --red-l:  #fee2e2;
+  --amber:  #d97706;
+  --amber-l:#fef3c7;
   --border: #e5e7eb;
-  --text: #111827;
-  --text2: #374151;
-  --text3: #6b7280;
-  --bg: #f3f4f6;
-  --white: #ffffff;
-  --sidebar-w: 240px;
-  --radius: 12px;
-  --radius-sm: 8px;
-  --bottom-nav-h: 0px; /* set to 60px on mobile via media query */
-  font-family: 'DM Sans', sans-serif;
+  --text:   #111827;
+  --text2:  #374151;
+  --text3:  #6b7280;
+  --bg:     #f1f5f9;
+  --white:  #ffffff;
+  --r:      16px;
+  --r-sm:   10px;
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-html { -webkit-text-size-adjust: 100%; }
-
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 15px;
-  line-height: 1.5;
-  min-height: 100vh;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'DM Sans',sans-serif;
+  font-size:16px;line-height:1.5;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
 }
 
-button { font-family: 'DM Sans', sans-serif; cursor: pointer; }
-input, select, textarea { font-family: 'DM Sans', sans-serif; }
-
-/* ── LAYOUT ── */
-.app { display: flex; min-height: 100vh; }
-
-.sidebar {
-  width: var(--sidebar-w); min-width: var(--sidebar-w);
-  background: var(--navy);
-  display: flex; flex-direction: column;
-  position: fixed; top: 0; left: 0; height: 100vh;
-  z-index: 100; overflow-y: auto;
-  transform: translateX(-100%);
-  transition: transform .28s cubic-bezier(.4,0,.2,1);
-  box-shadow: 4px 0 32px rgba(0,0,0,.22);
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+/* ── HEADER ── */
+.header{
+  background:var(--navy);
+  padding:16px 18px 18px;
+  padding-top:calc(14px + env(safe-area-inset-top));
+  position:sticky;top:0;z-index:50;
 }
-.sidebar::-webkit-scrollbar { display: none; }
-.sidebar.open { transform: translateX(0); }
-
-.main {
-  margin-left: 0; flex: 1;
-  display: flex; flex-direction: column;
-  min-height: 100vh;
-  transition: margin-left .28s cubic-bezier(.4,0,.2,1);
-  /* bottom padding so content not hidden behind bottom nav */
-  padding-bottom: env(safe-area-inset-bottom);
+.header-top{display:flex;align-items:center;gap:12px;margin-bottom:4px;}
+.header-logo{
+  width:36px;height:36px;background:var(--white);
+  border-radius:8px;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;overflow:hidden;
 }
-.main.pushed { margin-left: var(--sidebar-w); }
-
-/* ── SIDEBAR TOGGLE (desktop only) ── */
-#sb-toggle {
-  position: fixed;
-  bottom: 28px; left: 28px;
-  width: 48px; height: 48px;
-  border-radius: 50%;
-  background: var(--navy);
-  color: #fff;
-  border: none;
-  box-shadow: 0 4px 20px rgba(0,0,0,.28);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 20px;
-  cursor: pointer;
-  z-index: 300;
-  transition: background .2s, transform .18s;
+.header-logo img{height:22px;width:auto;}
+.header-info{flex:1;}
+.header-title{font-size:17px;font-weight:700;color:#fff;letter-spacing:-.02em;}
+.header-sub{font-size:13px;color:rgba(255,255,255,.4);margin-top:1px;}
+.header-badge{
+  background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.3);
+  color:#fbbf24;border-radius:20px;padding:5px 12px;
+  font-size:12px;font-weight:700;
+  display:flex;align-items:center;gap:5px;flex-shrink:0;
 }
-#sb-toggle:hover { background: var(--blue); transform: scale(1.08); }
-#sb-toggle.open { background: var(--blue); }
-
-/* ── SIDEBAR OVERLAY ── */
-#sb-overlay {
-  display: none;
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,.4);
-  z-index: 99;
-  -webkit-backdrop-filter: blur(2px);
-  backdrop-filter: blur(2px);
-}
-#sb-overlay.show { display: block; }
-
-/* ── SIDEBAR INNER ── */
-.sb-logo {
-  padding: 20px 16px 16px;
-  padding-top: calc(20px + env(safe-area-inset-top));
-  border-bottom: 1px solid rgba(255,255,255,.08);
-}
-.sb-logo-wrap { display: flex; align-items: center; gap: 10px; }
-.sb-logo-icon {
-  width: 36px; height: 36px; background: var(--blue);
-  border-radius: 9px; display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-.sb-logo-icon i { font-size: 18px; color: #fff; }
-.sb-logo-title { font-size: 13px; font-weight: 700; color: #fff; line-height: 1.2; letter-spacing: -.01em; }
-.sb-logo-sub { font-size: 10px; color: rgba(255,255,255,.38); margin-top: 2px; letter-spacing: .03em; text-transform: uppercase; }
-
-.sb-nav { flex: 1; padding: 10px 8px; }
-.sb-section {
-  font-size: 9.5px; font-weight: 700; color: rgba(255,255,255,.28);
-  letter-spacing: .1em; text-transform: uppercase; padding: 14px 10px 5px;
-}
-.sb-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 12px; border-radius: 8px;
-  cursor: pointer; font-size: 13.5px; font-weight: 500;
-  color: rgba(255,255,255,.58);
-  transition: all .14s; margin-bottom: 2px; user-select: none;
-  min-height: 44px;
-}
-.sb-item:hover { background: rgba(255,255,255,.07); color: rgba(255,255,255,.88); }
-.sb-item.active { background: var(--blue); color: #fff; }
-.sb-item i { font-size: 18px; width: 20px; flex-shrink: 0; }
-.sb-badge {
-  margin-left: auto; font-size: 10px;
-  background: var(--red); color: #fff;
-  padding: 2px 7px; border-radius: 20px; font-weight: 700;
-}
-
-.sb-user {
-  padding: 14px 14px;
-  padding-bottom: calc(14px + env(safe-area-inset-bottom));
-  border-top: 1px solid rgba(255,255,255,.08);
-  display: flex; align-items: center; gap: 10px;
-}
-.sb-avatar {
-  width: 34px; height: 34px; border-radius: 50%; background: var(--blue);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
-}
-.sb-uname { font-size: 13px; font-weight: 600; color: rgba(255,255,255,.88); }
-.sb-urole { font-size: 11px; color: rgba(255,255,255,.32); margin-top: 1px; }
-
-/* ── TOPBAR ── */
-.topbar {
-  background: var(--white);
-  border-bottom: 1px solid var(--border);
-  padding: 12px 18px;
-  padding-top: calc(12px + env(safe-area-inset-top));
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; position: sticky; top: 0; z-index: 50;
-}
-.topbar-title { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -.02em; }
-.topbar-sub { font-size: 11px; color: var(--text3); margin-top: 1px; font-weight: 400; }
-.topbar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-
-/* ── BUTTONS ── */
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 9px 16px; border-radius: var(--radius-sm);
-  font-size: 13.5px; font-weight: 600; border: 1.5px solid var(--border);
-  background: var(--white); color: var(--text2);
-  transition: all .14s; min-height: 40px;
-  -webkit-tap-highlight-color: transparent;
-  white-space: nowrap;
-}
-.btn:active { transform: scale(.97); }
-.btn:hover { background: var(--gray-light); }
-.btn i { font-size: 15px; }
-.btn-primary { background: var(--blue); color: #fff; border-color: var(--blue); }
-.btn-primary:hover { background: #1d4ed8; }
-.btn-danger { background: var(--red); color: #fff; border-color: var(--red); }
-.btn-danger:hover { background: #b91c1c; }
-.btn-success { background: var(--green); color: #fff; border-color: var(--green); }
-.btn-success:hover { background: #15803d; }
-.btn-sm { padding: 6px 11px; font-size: 12px; min-height: 34px; }
-.btn-sm i { font-size: 13px; }
-
-/* ── CONTENT ── */
-.content { padding: 16px 18px; flex: 1; }
-
-/* ── STAT CARDS ── */
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px; margin-bottom: 14px;
-}
-.stat-card {
-  background: var(--white);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px 14px 12px;
-}
-.stat-label {
-  font-size: 11px; font-weight: 600; color: var(--text3);
-  display: flex; align-items: center; gap: 5px; margin-bottom: 7px;
-  text-transform: uppercase; letter-spacing: .04em;
-}
-.stat-label i { font-size: 14px; }
-.stat-val { font-size: 30px; font-weight: 700; color: var(--text); line-height: 1; letter-spacing: -.03em; }
-.stat-sub { font-size: 11px; color: var(--text3); margin-top: 5px; font-weight: 400; }
-.stat-val.c-blue { color: var(--blue); }
-.stat-val.c-green { color: var(--green); }
-.stat-val.c-red { color: var(--red); }
-.stat-val.c-amber { color: var(--amber); }
-
-/* ── CARDS ── */
-.card {
-  background: var(--white);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
-  margin-bottom: 14px;
-}
-.card-title {
-  font-size: 14px; font-weight: 700; color: var(--text);
-  margin-bottom: 14px;
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  letter-spacing: -.01em;
-}
-.card-title-left { display: flex; align-items: center; gap: 8px; }
-.card-title i { font-size: 16px; color: var(--text3); }
-.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 0; }
-
-/* ── TABLE ── */
-.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th {
-  text-align: left; padding: 9px 12px;
-  font-size: 10.5px; font-weight: 700; color: var(--text3);
-  background: var(--bg); border-bottom: 1.5px solid var(--border);
-  white-space: nowrap; letter-spacing: .05em; text-transform: uppercase;
-}
-td {
-  padding: 11px 12px; border-bottom: 1px solid var(--border);
-  color: var(--text2); vertical-align: middle;
-}
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: #f9fafb; }
-.td-main { font-weight: 600; color: var(--text); font-size: 13.5px; }
-.td-sub { font-size: 11px; color: var(--text3); margin-top: 2px; font-weight: 400; }
-
-/* ── PILLS ── */
-.pill {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 9px; border-radius: 20px;
-  font-size: 11px; font-weight: 700; white-space: nowrap; letter-spacing: .02em;
-}
-.pill-inside  { background: var(--green-light); color: var(--green-text); }
-.pill-waiting { background: var(--amber-light); color: var(--amber-text); }
-.pill-out     { background: var(--gray-light); color: var(--gray); }
-.pill-overstay{ background: var(--red-light); color: var(--red-text); }
-.pill-pending { background: var(--blue-light); color: var(--blue-text); }
-.pill-high    { background: var(--red-light); color: var(--red-text); }
-.pill-medium  { background: var(--amber-light); color: var(--amber-text); }
-.pill-low     { background: var(--green-light); color: var(--green-text); }
-.pill-critical{ background: var(--red); color: #fff; }
-.pill-good    { background: var(--green-light); color: var(--green-text); }
-
-/* ── TIMER ── */
-.timer { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; color: var(--text2); }
-.timer.warn { color: var(--amber); }
-.timer.danger { color: var(--red); font-weight: 700; }
-
-/* ── MODAL ── */
-.modal-bg {
-  display: none; position: fixed; inset: 0;
-  background: rgba(0,0,0,.5); z-index: 200;
-  align-items: flex-end; justify-content: center;
-  padding: 0;
-}
-.modal-bg.open { display: flex; }
-.modal {
-  background: var(--white);
-  border-radius: var(--radius) var(--radius) 0 0;
-  padding: 20px 18px;
-  padding-bottom: calc(20px + env(safe-area-inset-bottom));
-  width: 100%; max-width: 100%;
-  max-height: 92vh; overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  box-shadow: 0 -8px 40px rgba(0,0,0,.18);
-  /* drag handle cue */
-  position: relative;
-}
-.modal::before {
-  content: '';
-  display: block;
-  width: 36px; height: 4px;
-  background: var(--border);
-  border-radius: 2px;
-  margin: 0 auto 16px;
-}
-.modal-title {
-  font-size: 16px; font-weight: 700; margin-bottom: 18px;
-  display: flex; align-items: center; justify-content: space-between;
-  letter-spacing: -.02em;
-}
-.modal-close {
-  background: var(--gray-light); border: none;
-  width: 30px; height: 30px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 16px; color: var(--text3); cursor: pointer;
-}
-.modal-close:hover { background: var(--border); color: var(--text); }
-
-/* ── FORM ── */
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.form-group { display: flex; flex-direction: column; gap: 5px; }
-.form-group.full { grid-column: 1 / -1; }
-label { font-size: 12px; font-weight: 600; color: var(--text2); letter-spacing: .01em; }
-input, select, textarea {
-  padding: 10px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
-  font-size: 15px; color: var(--text); background: var(--white); width: 100%;
-  transition: border .14s; outline: none;
-  min-height: 44px;
-  -webkit-appearance: none;
-  appearance: none;
-}
-select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 36px;
-}
-input:focus, select:focus, textarea:focus {
-  border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(37,99,235,.12);
-}
-textarea { resize: vertical; min-height: 72px; }
-.form-actions {
-  display: flex; gap: 8px; justify-content: flex-end;
-  margin-top: 18px; padding-top: 14px;
-  border-top: 1px solid var(--border);
-  flex-wrap: wrap;
-}
-.form-actions .btn { flex: 1; min-width: 0; justify-content: center; }
-
-/* ── SEARCH BAR ── */
-.search-wrap { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.search-input-wrap { position: relative; flex: 1; min-width: 160px; }
-.search-input-wrap i {
-  position: absolute; left: 11px; top: 50%;
-  transform: translateY(-50%); font-size: 16px; color: var(--text3); pointer-events: none;
-}
-.search-input { padding-left: 36px !important; }
-
-/* ── CHARTS ── */
-.chart-bars { display: flex; align-items: flex-end; gap: 6px; height: 100px; }
-.bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.bar { width: 100%; border-radius: 4px 4px 0 0; background: var(--blue); min-height: 4px; }
-.bar.alt { background: var(--green); }
-.bar.dim { opacity: .32; }
-.bar-label { font-size: 10px; color: var(--text3); font-family: 'DM Mono', monospace; }
-.bar-val { font-size: 10px; color: var(--text3); font-family: 'DM Mono', monospace; font-weight: 500; }
-
-/* ── ALERTS ── */
-.alert-row {
-  display: flex; align-items: flex-start; gap: 12px;
-  padding: 13px 0; border-bottom: 1px solid var(--border);
-}
-.alert-row:last-child { border-bottom: none; }
-.alert-icon {
-  width: 36px; height: 36px; border-radius: 9px;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.alert-icon i { font-size: 17px; }
-.alert-icon.high { background: var(--red-light); }
-.alert-icon.high i { color: var(--red); }
-.alert-icon.medium { background: var(--amber-light); }
-.alert-icon.medium i { color: var(--amber); }
-.alert-icon.low { background: var(--green-light); }
-.alert-icon.low i { color: var(--green); }
-.alert-body { flex: 1; }
-.alert-title { font-size: 13.5px; font-weight: 600; color: var(--text); }
-.alert-meta { font-size: 11.5px; color: var(--text3); margin-top: 3px; }
-.alert-action { display: flex; align-items: flex-start; margin-top: 4px; }
-
-/* ── AUDIT ── */
-.audit-row {
-  display: flex; gap: 10px; padding: 10px 0;
-  border-bottom: 1px solid var(--border); font-size: 12px;
-  flex-wrap: wrap;
-}
-.audit-row:last-child { border-bottom: none; }
-.audit-action { font-weight: 600; color: var(--text); min-width: 90px; }
-.audit-user { color: var(--blue); font-weight: 500; }
-.audit-time { font-family: 'DM Mono', monospace; color: var(--text3); font-size: 11px; min-width: 110px; }
-.audit-detail { color: var(--text3); flex: 1; min-width: 100px; }
-
-/* ── EMPTY STATE ── */
-.empty { text-align: center; padding: 40px 20px; color: var(--text3); }
-.empty i { font-size: 36px; margin-bottom: 10px; display: block; opacity: .35; }
-.empty p { font-size: 13.5px; font-weight: 500; }
-
-/* ── EMERGENCY BANNER ── */
-.emergency-banner {
-  background: var(--red); color: #fff; padding: 14px 16px;
-  display: flex; align-items: center; gap: 10px;
-  font-weight: 700; font-size: 14px; border-radius: var(--radius);
-  margin-bottom: 14px; flex-wrap: wrap;
-}
-.emergency-banner i { font-size: 22px; flex-shrink: 0; }
-
-/* ── QR ── */
-.qr-box {
-  border: 2px dashed var(--border); border-radius: var(--radius);
-  padding: 20px; text-align: center; background: var(--bg);
-}
-.qr-img {
-  width: 160px; height: 160px; border-radius: 10px;
-  margin: 0 auto 12px; background: var(--white);
-  display: flex; align-items: center; justify-content: center;
-  border: 1.5px solid var(--border);
-}
-
-/* ── PHOTO UPLOAD ── */
-.photo-upload {
-  border: 2px dashed var(--border); border-radius: var(--radius-sm);
-  padding: 20px; text-align: center; cursor: pointer;
-  transition: border .14s; background: var(--bg);
-}
-.photo-upload:hover { border-color: var(--blue); }
-.photo-upload i { font-size: 28px; color: var(--text3); }
-.photo-upload p { font-size: 12px; color: var(--text3); margin-top: 4px; }
-.photo-preview { width: 80px; height: 80px; border-radius: 8px; object-fit: cover; margin: 0 auto; display: block; }
-
-/* ── BADGE PREVIEW ── */
-.badge-card {
-  background: var(--navy); border-radius: var(--radius); padding: 20px; color: #fff;
-}
-.badge-card .bc-name { font-size: 18px; font-weight: 700; margin-bottom: 4px; letter-spacing: -.02em; }
-.badge-card .bc-company { font-size: 12px; color: rgba(255,255,255,.58); }
-.badge-card .bc-detail { font-size: 11px; color: rgba(255,255,255,.45); margin-top: 12px; }
-.badge-card .bc-status {
-  display: inline-flex; background: var(--blue);
-  padding: 3px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; margin-top: 8px;
-}
+.header-badge i{font-size:13px;}
 
 /* ── TABS ── */
-.tabs {
-  display: flex; gap: 2px; border-bottom: 1.5px solid var(--border);
-  margin-bottom: 14px; flex-wrap: wrap; overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+.tabs{
+  display:flex;gap:6px;
+  padding:14px 18px 0;
+  background:var(--navy);
 }
-.tab {
-  padding: 10px 16px; font-size: 13px; font-weight: 600;
-  cursor: pointer; color: var(--text3);
-  border-bottom: 2.5px solid transparent; margin-bottom: -1.5px;
-  transition: all .14s; white-space: nowrap; min-height: 44px;
-  display: flex; align-items: center;
+.tab-btn{
+  flex:1;padding:10px 8px;
+  background:rgba(255,255,255,.07);
+  border:1.5px solid rgba(255,255,255,.1);
+  border-bottom:none;border-radius:10px 10px 0 0;
+  color:rgba(255,255,255,.45);
+  font-size:13px;font-weight:600;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;
+  transition:background .14s,color .14s;
+  -webkit-tap-highlight-color:transparent;
 }
-.tab.active { color: var(--blue); border-bottom-color: var(--blue); }
-.tab:hover:not(.active) { color: var(--text); }
-.tab-pane { display: none; }
-.tab-pane.active { display: block; }
-
-/* ── TYPE TABS ── */
-.type-tabs {
-  display: flex; gap: 6px; margin-bottom: 14px;
-  overflow-x: auto; -webkit-overflow-scrolling: touch;
-  padding-bottom: 4px;
-  scrollbar-width: none;
-}
-.type-tabs::-webkit-scrollbar { display: none; }
-.type-tab {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 14px; border-radius: 20px;
-  font-size: 12.5px; font-weight: 600;
-  cursor: pointer; border: 2px solid var(--border);
-  background: var(--white); color: var(--text3);
-  transition: all .14s; white-space: nowrap; min-height: 40px;
-  flex-shrink: 0;
-  -webkit-tap-highlight-color: transparent;
-}
-.type-tab:hover { border-color: var(--blue); color: var(--blue); }
-.type-tab.active { border-color: var(--blue); background: var(--blue); color: #fff; }
-.type-tab .count {
-  background: rgba(255,255,255,.25);
-  padding: 1px 6px; border-radius: 10px; font-size: 11px;
-}
-.type-tab:not(.active) .count { background: var(--gray-light); color: var(--text3); }
-
-/* ── TOAST ── */
-#toast-container {
-  position: fixed; bottom: 80px; right: 16px;
-  z-index: 999; display: flex; flex-direction: column; gap: 8px;
-}
-.toast {
-  background: #1f2937; color: #fff; padding: 11px 16px;
-  border-radius: var(--radius-sm); font-size: 13.5px; font-weight: 500;
-  display: flex; align-items: center; gap: 9px;
-  animation: slideIn .25s ease; min-width: 220px;
-  box-shadow: 0 4px 20px rgba(0,0,0,.2);
-}
-.toast.success { border-left: 3px solid var(--green); }
-.toast.error   { border-left: 3px solid var(--red); }
-.toast.info    { border-left: 3px solid var(--blue); }
-@keyframes slideIn {
-  from { transform: translateX(100%); opacity: 0; }
-  to   { transform: translateX(0); opacity: 1; }
+.tab-btn i{font-size:16px;}
+.tab-btn.active{
+  background:var(--bg);color:var(--text);
+  border-color:var(--border);
 }
 
-/* ── BOTTOM NAV (mobile only) ── */
-.bottom-nav {
-  display: none;
-  position: fixed; bottom: 0; left: 0; right: 0;
-  background: var(--white);
-  border-top: 1.5px solid var(--border);
-  padding: 8px 4px;
-  padding-bottom: calc(8px + env(safe-area-inset-bottom));
-  z-index: 150;
-  grid-template-columns: repeat(5, 1fr);
-  align-items: end;
-}
-.bn-item {
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  padding: 6px 4px; cursor: pointer; border-radius: 8px;
-  -webkit-tap-highlight-color: transparent;
-  color: var(--text3); transition: color .14s;
-  font-size: 9.5px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: .04em;
-  position: relative;
-}
-.bn-item i { font-size: 22px; }
-.bn-item.active { color: var(--blue); }
-.bn-item .bn-badge {
-  position: absolute; top: 2px; right: 50%;
-  transform: translateX(6px);
-  background: var(--red); color: #fff;
-  font-size: 9px; font-weight: 700;
-  padding: 1px 5px; border-radius: 10px;
-  min-width: 16px; text-align: center;
+/* ── BODY ── */
+.body{
+  padding:18px 18px;
+  padding-bottom:calc(24px + env(safe-area-inset-bottom));
 }
 
-/* ── UTILS ── */
-.mt8  { margin-top: 8px; }
-.mt12 { margin-top: 12px; }
-.mt16 { margin-top: 16px; }
-.mb16 { margin-bottom: 16px; }
-.text-center { text-align: center; }
-.flex-between { display: flex; align-items: center; justify-content: space-between; }
-.flex-gap8 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.mono { font-family: 'DM Mono', monospace; font-size: 12px; }
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
 
-/* ══════════════════════════════
-   MOBILE RESPONSIVE
-══════════════════════════════ */
-@media (max-width: 768px) {
+/* ── SCAN PANEL ── */
+.scan-box{
+  background:var(--white);border-radius:var(--r);
+  border:1.5px solid var(--border);
+  padding:24px 18px;margin-bottom:14px;
+  text-align:center;
+}
+.scan-icon{
+  width:72px;height:72px;border-radius:50%;
+  background:var(--blue-l);border:2px solid #bfdbfe;
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 16px;
+}
+.scan-icon i{font-size:36px;color:var(--blue);}
+.scan-title{font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;}
+.scan-sub{font-size:14px;color:var(--text3);line-height:1.5;margin-bottom:20px;}
 
-  :root {
-    --bottom-nav-h: 60px;
-  }
+/* Camera viewfinder */
+.viewfinder{
+  position:relative;width:100%;max-width:300px;
+  margin:0 auto 16px;border-radius:12px;overflow:hidden;
+  background:#000;aspect-ratio:1;
+}
+.viewfinder video{width:100%;height:100%;object-fit:cover;display:block;}
+.viewfinder canvas{display:none;}
+.vf-overlay{
+  position:absolute;inset:0;
+  background:rgba(0,0,0,.45);
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:none;
+}
+.vf-frame{
+  width:200px;height:200px;
+  border:3px solid rgba(255,255,255,.9);
+  border-radius:12px;
+  box-shadow:0 0 0 9999px rgba(0,0,0,.45);
+}
+.vf-corners::before,.vf-corners::after{
+  content:'';position:absolute;width:30px;height:30px;
+  border-color:var(--blue);border-style:solid;
+}
+.vf-corners::before{top:0;left:0;border-width:3px 0 0 3px;border-radius:4px 0 0 0;}
+.vf-corners::after{bottom:0;right:0;border-width:0 3px 3px 0;border-radius:0 0 4px 0;}
 
-  /* Show bottom nav, hide desktop toggle */
-  .bottom-nav { display: grid; }
-  #sb-toggle { display: none; }
-
-  /* Mobile: sidebar overlay di atas, main TIDAK bergeser */
-  .main.pushed { margin-left: 0 !important; }
-
-  /* Main content gets bottom padding for nav */
-  .main {
-    padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
-  }
-
-  /* Content padding tighter */
-  .content { padding: 12px 14px; }
-
-  /* Topbar compact */
-  .topbar { padding: 10px 14px; padding-top: calc(10px + env(safe-area-inset-top)); }
-  .topbar-title { font-size: 15px; }
-  .topbar-sub { display: none; }
-
-  /* Stat grid: 2-col on mobile */
-  .stat-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px; }
-  .stat-val { font-size: 26px; }
-  .stat-card { padding: 12px; }
-
-  /* row2 = single col */
-  .row2 { grid-template-columns: 1fr; }
-
-  /* Visitor type tabs — horizontal scroll */
-  .type-tabs { gap: 5px; }
-
-  /* Table: smaller font */
-  table { font-size: 12px; }
-  th { font-size: 10px; padding: 8px 8px; }
-  td { padding: 10px 8px; }
-  .td-main { font-size: 13px; }
-
-  /* Form grid: single column */
-  .form-grid { grid-template-columns: 1fr; }
-  .form-group.full { grid-column: 1; }
-
-  /* Modal: bottom sheet, taller */
-  .modal { max-height: 95vh; border-radius: 16px 16px 0 0; }
-
-  /* Buttons in tables: icon-only or compact */
-  .btn-sm { padding: 7px 9px; }
-
-  /* Toast position above bottom nav */
-  #toast-container { bottom: calc(var(--bottom-nav-h) + 12px + env(safe-area-inset-bottom)); right: 12px; }
-
-  /* Search wrap */
-  .search-wrap { flex-wrap: wrap; }
-  .search-wrap select { width: 100% !important; }
-
-  /* Emergency banner */
-  .emergency-banner { font-size: 13px; padding: 12px 14px; }
-
-  /* Tabs: scrollable */
-  .tabs { flex-wrap: nowrap; overflow-x: auto; }
-  .tab { font-size: 12.5px; padding: 10px 14px; }
-
-  /* Cards */
-  .card { padding: 14px; border-radius: 10px; }
-  .card-title { font-size: 13.5px; margin-bottom: 12px; }
+.scan-line{
+  position:absolute;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--blue),transparent);
+  animation:scanLine 2s linear infinite;
+  pointer-events:none;
+}
+@keyframes scanLine{
+  0%{top:15%;}100%{top:85%;}
 }
 
-@media (min-width: 769px) {
-  /* Desktop: centered modal */
-  .modal-bg { align-items: center; padding: 20px; }
-  .modal {
-    border-radius: var(--radius);
-    max-width: 560px;
-    padding: 24px;
-    padding-bottom: 24px;
-  }
-  .modal::before { display: none; }
+.btn-scan{
+  background:var(--blue);color:#fff;
+  border:none;border-radius:var(--r-sm);
+  padding:14px 24px;font-size:15px;font-weight:700;
+  display:inline-flex;align-items:center;gap:8px;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+  transition:background .14s,transform .1s;
 }
+.btn-scan:active{transform:scale(.97);background:var(--blue-d);}
+.btn-scan i{font-size:18px;}
+.btn-scan.stop{background:var(--red);}
+
+/* ── MANUAL PANEL ── */
+.manual-box{
+  background:var(--white);border-radius:var(--r);
+  border:1.5px solid var(--border);
+  padding:20px 18px;margin-bottom:14px;
+}
+.box-label{
+  font-size:12px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--text3);
+  margin-bottom:14px;display:flex;align-items:center;gap:6px;
+}
+.box-label i{font-size:16px;}
+.field{margin-bottom:14px;}
+.field:last-child{margin-bottom:0;}
+.field label{display:block;font-size:14px;font-weight:600;color:var(--text2);margin-bottom:6px;}
+.field input,.field select{
+  width:100%;padding:14px 15px;
+  border:1.5px solid var(--border);border-radius:var(--r-sm);
+  font-size:16px;color:var(--text);background:var(--bg);outline:none;
+  transition:border .14s,box-shadow .14s;min-height:52px;
+  -webkit-appearance:none;appearance:none;
+  font-family:'DM Mono',monospace;letter-spacing:.04em;
+}
+.field input:focus,.field select:focus{
+  border-color:var(--blue);
+  box-shadow:0 0 0 3px rgba(37,99,235,.12);
+  background:var(--white);
+}
+.field-hint{font-size:13px;color:var(--text3);margin-top:5px;}
+.field-error{font-size:13px;color:var(--red);margin-top:5px;display:none;}
+.field.has-error input{border-color:var(--red);}
+.field.has-error .field-error{display:block;}
+
+.btn-search{
+  width:100%;background:var(--blue);color:#fff;
+  border:none;border-radius:var(--r-sm);
+  padding:15px 20px;font-size:15px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  cursor:pointer;min-height:52px;
+  -webkit-tap-highlight-color:transparent;
+  transition:background .14s,transform .1s;
+}
+.btn-search:active{transform:scale(.98);background:var(--blue-d);}
+.btn-search i{font-size:18px;}
+
+/* ── VISITOR CARD (hasil pencarian) ── */
+.visitor-card{
+  background:var(--white);border-radius:var(--r);
+  border:2px solid var(--border);
+  overflow:hidden;margin-bottom:14px;
+}
+.vc-header{
+  padding:16px 18px;
+  display:flex;align-items:center;gap:12px;
+}
+.vc-avatar{
+  width:48px;height:48px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:24px;flex-shrink:0;
+}
+.vc-info{flex:1;min-width:0;}
+.vc-name{font-size:16px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.vc-meta{font-size:13px;color:var(--text3);margin-top:2px;}
+.vc-status{flex-shrink:0;}
+.status-pill{
+  display:inline-flex;align-items:center;gap:5px;
+  border-radius:20px;padding:5px 12px;
+  font-size:12px;font-weight:700;
+}
+.status-pill.waiting{background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.3);color:#d97706;}
+.status-pill.approved{background:var(--green-l);border:1px solid #86efac;color:var(--green);}
+.status-pill.checkedout{background:#f3f4f6;border:1px solid var(--border);color:var(--text3);}
+
+.vc-body{
+  border-top:1px solid var(--border);
+  padding:14px 18px;
+}
+.vc-row{display:flex;align-items:flex-start;gap:10px;padding:6px 0;border-bottom:1px solid #f3f4f6;}
+.vc-row:last-child{border-bottom:none;padding-bottom:0;}
+.vc-row:first-child{padding-top:0;}
+.vcr-label{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text3);min-width:90px;padding-top:2px;flex-shrink:0;}
+.vcr-value{font-size:14px;font-weight:500;color:var(--text);flex:1;word-break:break-word;}
+
+.vc-id{
+  padding:10px 18px;border-top:1px solid var(--border);
+  font-family:'DM Mono',monospace;font-size:13px;
+  color:var(--text3);letter-spacing:.04em;
+  background:#fafafa;display:flex;align-items:center;gap:8px;
+}
+.vc-id i{font-size:15px;}
+
+.vc-actions{padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:10px;}
+.btn-checkout{
+  flex:1;background:var(--green);color:#fff;
+  border:none;border-radius:var(--r-sm);
+  padding:14px 16px;font-size:15px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  cursor:pointer;min-height:52px;
+  -webkit-tap-highlight-color:transparent;
+  transition:background .14s,transform .1s;
+}
+.btn-checkout:active{transform:scale(.98);background:var(--green-d);}
+.btn-checkout i{font-size:18px;}
+.btn-checkout:disabled{background:#9ca3af;cursor:not-allowed;}
+.btn-clear{
+  width:52px;height:52px;border-radius:var(--r-sm);
+  background:var(--red-l);border:1px solid var(--red-l);
+  color:var(--red);font-size:20px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;flex-shrink:0;
+}
+
+/* ── ALREADY CHECKED OUT ── */
+.already-out{
+  background:var(--white);border-radius:var(--r);
+  border:1.5px solid var(--border);
+  padding:24px 18px;text-align:center;margin-bottom:14px;
+}
+.already-out i{font-size:40px;color:var(--text3);margin-bottom:12px;display:block;}
+.already-out p{font-size:14px;color:var(--text3);line-height:1.6;}
+
+/* ── SUCCESS TOAST / CARD ── */
+.checkout-success{
+  background:var(--green-l);border:2px solid #86efac;
+  border-radius:var(--r);padding:20px 18px;
+  margin-bottom:14px;
+  animation:fadeIn .3s ease;
+}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.cs-header{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+.cs-icon{
+  width:48px;height:48px;border-radius:50%;
+  background:rgba(22,163,74,.15);border:2px solid rgba(22,163,74,.4);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.cs-icon i{font-size:24px;color:var(--green);}
+.cs-title{font-size:16px;font-weight:700;color:var(--green);}
+.cs-sub{font-size:13px;color:#166534;margin-top:2px;}
+.cs-rows{border-top:1px solid #86efac;padding-top:12px;}
+.cs-row{display:flex;gap:10px;padding:5px 0;}
+.cs-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#166534;min-width:90px;padding-top:2px;flex-shrink:0;}
+.cs-value{font-size:14px;font-weight:500;color:#14532d;flex:1;}
+.btn-done{
+  width:100%;margin-top:14px;
+  background:var(--green);color:#fff;
+  border:none;border-radius:var(--r-sm);
+  padding:14px 16px;font-size:15px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  cursor:pointer;min-height:52px;
+  -webkit-tap-highlight-color:transparent;
+}
+.btn-done:active{background:var(--green-d);}
+
+/* ── ACTIVE VISITORS LIST ── */
+.list-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:12px;
+}
+.list-title{font-size:15px;font-weight:700;color:var(--text);}
+.list-count{
+  background:var(--blue-l);color:var(--blue);
+  border-radius:20px;padding:3px 10px;
+  font-size:12px;font-weight:700;
+}
+.visitor-list{display:flex;flex-direction:column;gap:10px;}
+.vl-item{
+  background:var(--white);border-radius:var(--r);
+  border:1.5px solid var(--border);
+  padding:14px 16px;
+  display:flex;align-items:center;gap:12px;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+  transition:border-color .14s,background .14s;
+}
+.vl-item:active{background:#f8fafc;border-color:var(--blue);}
+.vl-avatar{
+  width:44px;height:44px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;flex-shrink:0;
+}
+.vl-info{flex:1;min-width:0;}
+.vl-name{font-size:15px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.vl-meta{font-size:13px;color:var(--text3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.vl-time{
+  font-size:12px;font-weight:600;color:var(--text3);
+  text-align:right;flex-shrink:0;
+}
+.vl-chevron{color:var(--text3);font-size:18px;flex-shrink:0;}
+
+.empty-state{
+  text-align:center;padding:48px 24px;
+  background:var(--white);border-radius:var(--r);border:1.5px solid var(--border);
+}
+.empty-state i{font-size:40px;color:var(--text3);margin-bottom:12px;display:block;}
+.empty-state p{font-size:14px;color:var(--text3);line-height:1.6;}
+
+/* ── INFO BANNER ── */
+.info-banner{
+  background:var(--blue-l);color:#1e40af;
+  border:1.5px solid #bfdbfe;border-radius:var(--r-sm);
+  padding:12px 14px;display:flex;align-items:flex-start;gap:10px;
+  font-size:13px;line-height:1.5;margin-bottom:14px;
+}
+.info-banner i{font-size:16px;flex-shrink:0;margin-top:1px;}
+
+/* ── LOADING ── */
+#loading{
+  display:none;position:fixed;inset:0;
+  background:rgba(15,24,41,.85);z-index:500;
+  align-items:center;justify-content:center;
+  flex-direction:column;gap:14px;
+}
+#loading.show{display:flex;}
+.spinner{
+  width:40px;height:40px;border:3px solid rgba(255,255,255,.2);
+  border-top-color:var(--blue);border-radius:50%;
+  animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+#loading p{color:rgba(255,255,255,.6);font-size:14px;font-weight:500;}
+
+/* ── MODAL CONFIRM ── */
+.modal-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.5);z-index:300;
+  align-items:flex-end;justify-content:center;
+}
+.modal-overlay.show{display:flex;}
+.modal{
+  background:var(--white);border-radius:20px 20px 0 0;
+  padding:24px 20px;
+  padding-bottom:calc(24px + env(safe-area-inset-bottom));
+  width:100%;max-width:480px;
+  animation:slideUp .25s ease;
+}
+@keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+.modal-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px;}
+.modal-sub{font-size:14px;color:var(--text3);line-height:1.5;margin-bottom:20px;}
+.modal-visitor{
+  background:var(--bg);border-radius:var(--r-sm);
+  padding:14px;margin-bottom:20px;
+}
+.mv-name{font-size:16px;font-weight:700;color:var(--text);}
+.mv-meta{font-size:13px;color:var(--text3);margin-top:3px;}
+.modal-actions{display:flex;gap:10px;}
+.btn-cancel{
+  flex:1;background:var(--bg);border:1.5px solid var(--border);
+  color:var(--text2);border-radius:var(--r-sm);
+  padding:14px;font-size:15px;font-weight:600;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+}
+.btn-confirm-checkout{
+  flex:2;background:var(--green);color:#fff;
+  border:none;border-radius:var(--r-sm);
+  padding:14px;font-size:15px;font-weight:700;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.btn-confirm-checkout:active{background:var(--green-d);}
+
+.hidden{display:none!important;}
 </style>
 </head>
 <body>
-<div class="app">
 
-<!-- TOGGLE BUTTON -->
-<button id="sb-toggle" onclick="toggleSidebar()"><i class="ti ti-menu-2" id="sb-toggle-icon"></i></button>
-<!-- OVERLAY -->
-<div id="sb-overlay" onclick="toggleSidebar()"></div>
+<div id="loading"><div class="spinner"></div><p>Memproses checkout...</p></div>
 
-<!-- ════════ SIDEBAR ════════ -->
-<div class="sidebar" id="sidebar">
-  <div class="sb-logo">
-    <div class="sb-logo-wrap">
-      <div class="sb-logo-icon"><i class="ti ti-shield-check"></i></div>
-      <div>
-        <div class="sb-logo-title">Visitor System</div>
-        <div class="sb-logo-sub">Security Management</div>
-      </div>
-    </div>
-  </div>
-  <nav class="sb-nav">
-    <div class="sb-section">Main</div>
-    <div class="sb-item active" onclick="nav('dashboard',this)"><i class="ti ti-layout-dashboard"></i> Dashboard</div>
-    <div class="sb-item" onclick="nav('visitors',this)"><i class="ti ti-users"></i> Visitor Management <span class="sb-badge" id="badge-visitors">0</span></div>
-    <div class="sb-item" onclick="nav('equipment',this)"><i class="ti ti-package"></i> Equipment</div>
-    <div class="sb-section">Monitoring</div>
-    <div class="sb-item" onclick="nav('realtime',this)"><i class="ti ti-activity"></i> Real-time Monitor</div>
-    <div class="sb-item" onclick="nav('alerts',this)"><i class="ti ti-bell"></i> Alerts <span class="sb-badge" id="badge-alerts">0</span></div>
-    <div class="sb-item" onclick="nav('emergency',this)"><i class="ti ti-alert-triangle"></i> Emergency</div>
-    <div class="sb-section">Records</div>
-<div class="sb-item" onclick="window.open('print-module.html','_blank')"><i class="ti ti-printer"></i> Print Center</div>
-    <div class="sb-item" onclick="nav('qr',this)"><i class="ti ti-qrcode"></i> QR System</div>
-    <div class="sb-item" onclick="nav('reports',this)"><i class="ti ti-chart-bar"></i> Reports</div>
-    <div class="sb-item" onclick="nav('audit',this)"><i class="ti ti-history"></i> Audit Trail</div>
-  </nav>
-  <div class="sb-user">
-    <div class="sb-avatar" id="sb-avatar-text">AR</div>
-    <div>
-      <div class="sb-uname" id="sb-uname">Prasad Seeds P2</div>
-      <div class="sb-urole" id="sb-urole">Security Officer</div>
-    </div>
-  </div>
-</div>
-
-<!-- ════════ MAIN ════════ -->
-<div class="main">
-
-  <!-- TOPBAR -->
-  <div class="topbar">
-    <div>
-      <div class="topbar-title" id="page-title">Dashboard Overview</div>
-      <div class="topbar-sub" id="page-sub">Live monitoring · Real-time</div>
-    </div>
-    <div class="topbar-actions" id="topbar-actions">
-      <button class="btn btn-primary" onclick="openModal('modal-select-type')"><i class="ti ti-user-plus"></i> Check In Visitor</button>
-    </div>
-  </div>
-
-  <!-- ══ PAGES ══ -->
-  <div class="content">
-
-    <!-- ── DASHBOARD ── -->
-    <div id="page-dashboard">
-      <!-- Row 1: summary -->
-      <div class="stat-grid" style="grid-template-columns: repeat(4,1fr)">
-        <div class="stat-card">
-          <div class="stat-label"><i class="ti ti-users" style="color:var(--blue)"></i> Total Inside</div>
-          <div class="stat-val c-blue" id="stat-inside">0</div>
-          <div class="stat-sub">Semua tipe aktif</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"><i class="ti ti-package" style="color:var(--blue)"></i> Active Equipment</div>
-          <div class="stat-val c-blue" id="stat-equip">0</div>
-          <div class="stat-sub">Inside factory</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"><i class="ti ti-alert-circle" style="color:var(--red)"></i> Overstay Alerts</div>
-          <div class="stat-val c-red" id="stat-overstay">0</div>
-          <div class="stat-sub">Needs attention</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"><i class="ti ti-calendar" style="color:var(--amber)"></i> Today's Visitors</div>
-          <div class="stat-val c-amber" id="stat-today">0</div>
-          <div class="stat-sub">Total check-ins today</div>
-        </div>
-      </div>
-      <!-- Row 2: per type -->
-      <div class="stat-grid" style="grid-template-columns: repeat(5,1fr); margin-top:-4px">
-        <div class="stat-card">
-          <div class="stat-label"><i class="ti ti-user" style="color:var(--blue)"></i> Guest</div>
-          <div class="stat-val c-blue" id="stat-guest">0</div>
-          <div class="stat-sub">Inside</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"><i class="ti ti-hard-hat" style="color:var(--amber)"></i> Contractor</div>
-          <div class="stat-val c-amber" id="stat-contractor">0</div>
-          <div class="stat-sub">Inside</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"><i class="ti ti-truck" style="color:var(--green)"></i> Driver</div>
-          <div class="stat-val c-green" id="stat-driver">0</div>
-          <div class="stat-sub">Inside</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"><i class="ti ti-id-badge" style="color:var(--navy3)"></i> Employee Test</div>
-          <div class="stat-val" id="stat-employee" style="color:var(--navy3)">0</div>
-          <div class="stat-sub">Inside</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"><i class="ti ti-clipboard-check" style="color:var(--red)"></i> Auditor</div>
-          <div class="stat-val c-red" id="stat-auditor">0</div>
-          <div class="stat-sub">Inside</div>
-        </div>
-      </div>
-
-      <div class="row2">
-        <div class="card">
-          <div class="card-title"><span class="card-title-left"><i class="ti ti-chart-bar"></i> Visitor Trend (7 days)</span></div>
-          <div class="chart-bars" id="dash-chart-visitors"></div>
-        </div>
-        <div class="card">
-          <div class="card-title"><span class="card-title-left"><i class="ti ti-bell"></i> Recent Alerts</span></div>
-          <div id="dash-alerts"></div>
-        </div>
-      </div>
-
-      <div class="card mt12">
-        <div class="card-title">
-          <span class="card-title-left"><i class="ti ti-users"></i> Active Visitors</span>
-          <button class="btn btn-sm" onclick="nav('visitors', document.querySelector('[onclick*=visitors]'))"><i class="ti ti-external-link"></i> View All</button>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Visitor</th><th>Company</th><th>Host / PIC</th><th>Purpose</th><th>Check-in</th><th>Duration</th><th>Status</th><th>Action</th></tr></thead>
-            <tbody id="dash-visitor-table"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── VISITOR MANAGEMENT ── -->
-    <div id="page-visitors" style="display:none">
-      <!-- Type tabs -->
-      <div class="type-tabs" id="visitor-type-tabs">
-        <div class="type-tab active" onclick="switchVisitorType('all',this)"><i class="ti ti-list"></i> Semua <span class="count" id="tc-all">0</span></div>
-        <div class="type-tab" onclick="switchVisitorType('Guest',this)"><i class="ti ti-user"></i> Guest <span class="count" id="tc-guest">0</span></div>
-        <div class="type-tab" onclick="switchVisitorType('Contractor',this)"><i class="ti ti-hard-hat"></i> Contractor <span class="count" id="tc-contractor">0</span></div>
-        <div class="type-tab" onclick="switchVisitorType('Driver',this)"><i class="ti ti-truck"></i> Driver <span class="count" id="tc-driver">0</span></div>
-        <div class="type-tab" onclick="switchVisitorType('Employee Test',this)"><i class="ti ti-id-badge"></i> Employee Test <span class="count" id="tc-employee">0</span></div>
-        <div class="type-tab" onclick="switchVisitorType('Auditor',this)"><i class="ti ti-clipboard-check"></i> Auditor <span class="count" id="tc-auditor">0</span></div>
-      </div>
-      <!-- Status tabs -->
-      <div class="tabs">
-        <div class="tab active" onclick="switchTab('visitors','all',this)">Semua</div>
-        <div class="tab" onclick="switchTab('visitors','inside',this)">Inside</div>
-        <div class="tab" onclick="switchTab('visitors','today',this)">Today</div>
-        <div class="tab" onclick="switchTab('visitors','out',this)">Checked Out</div>
-      </div>
-      <div class="search-wrap">
-        <div class="search-input-wrap">
-          <i class="ti ti-search"></i>
-          <input type="text" class="search-input" id="visitor-search" placeholder="Search by name, company, or host..." oninput="renderVisitorTable()">
-        </div>
-        <select id="visitor-filter-status" onchange="renderVisitorTable()" style="width:160px">
-          <option value="">All Status</option>
-          <option value="Inside">Inside</option>
-          <option value="Waiting Approval">Waiting Approval</option>
-          <option value="Checked Out">Checked Out</option>
-          <option value="Overstay">Overstay</option>
-        </select>
-        <button class="btn btn-primary" onclick="openCheckinByType()"><i class="ti ti-plus"></i> Check In</button>
-      </div>
-      <div class="card" style="padding:0">
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>#</th><th>Visitor</th><th>Tipe</th><th>Company</th><th>Host / PIC</th><th>Check-in</th><th>Duration</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody id="visitor-table"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── EQUIPMENT ── -->
-    <div id="page-equipment" style="display:none">
-      <div class="tabs">
-        <div class="tab active" onclick="switchTab('equipment','all',this)">All Equipment</div>
-        <div class="tab" onclick="switchTab('equipment','inside',this)">Inside</div>
-        <div class="tab" onclick="switchTab('equipment','outside',this)">Outside</div>
-        <div class="tab" onclick="switchTab('equipment','pending',this)">Pending</div>
-      </div>
-      <div class="search-wrap">
-        <div class="search-input-wrap">
-          <i class="ti ti-search"></i>
-          <input type="text" class="search-input" id="equip-search" placeholder="Search equipment..." oninput="renderEquipmentTable()">
-        </div>
-        <button class="btn btn-primary" onclick="openModal('modal-equipment')"><i class="ti ti-plus"></i> Add Equipment</button>
-      </div>
-      <div class="card" style="padding:0">
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>#</th><th>Equipment</th><th>Serial No.</th><th>Owner</th><th>Gate Pass</th><th>Condition</th><th>Status</th><th>Date In</th><th>Actions</th></tr></thead>
-            <tbody id="equipment-table"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── REAL-TIME MONITOR ── -->
-    <div id="page-realtime" style="display:none">
-      <div class="stat-grid">
-        <div class="stat-card">
-          <div class="stat-label"><i class="ti ti-user" style="color:var(--green)"></i> Visitors Inside</div>
-          <div class="stat-val c-green" id="rt-inside">0</div>
-          <div class="stat-sub">Live count</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"><i class="ti ti-clock" style="color:var(--amber)"></i> Longest Duration</div>
-          <div class="timer" id="rt-longest" style="font-size:22px;font-weight:600">00:00:00</div>
-          <div class="stat-sub" id="rt-longest-name">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"><i class="ti ti-alert-triangle" style="color:var(--red)"></i> Overstay</div>
-          <div class="stat-val c-red" id="rt-overstay">0</div>
-          <div class="stat-sub">Over 4 hours</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"><i class="ti ti-package" style="color:var(--blue)"></i> Equipment Inside</div>
-          <div class="stat-val c-blue" id="rt-equip">0</div>
-          <div class="stat-sub">Active</div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-title"><span class="card-title-left"><i class="ti ti-activity"></i> Live Visitor Monitor</span>
-          <span style="font-size:11px;color:var(--green);display:flex;align-items:center;gap:4px">
-            <span style="width:7px;height:7px;background:var(--green);border-radius:50%;animation:pulse 1.5s infinite"></span> Live
-          </span>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Visitor</th><th>Company</th><th>Host / PIC</th><th>Check-in Time</th><th>Live Duration</th><th>Status</th><th>Action</th></tr></thead>
-            <tbody id="rt-table"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── ALERTS ── -->
-    <div id="page-alerts" style="display:none">
-      <div class="card">
-        <div class="card-title"><span class="card-title-left"><i class="ti ti-bell"></i> Alert Management</span>
-          <button class="btn btn-sm" onclick="checkAlerts(); renderAlerts(); toast('Alerts refreshed','info')"><i class="ti ti-refresh"></i> Refresh</button>
-        </div>
-        <div id="alerts-list"></div>
-      </div>
-    </div>
-
-    <!-- ── EMERGENCY ── -->
-    <div id="page-emergency" style="display:none">
-      <div class="emergency-banner">
-        <i class="ti ti-alert-triangle"></i>
-        EMERGENCY DASHBOARD — All visitors currently inside factory
-        <button class="btn btn-sm" onclick="exportEmergency()" style="margin-left:auto;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff"><i class="ti ti-download"></i> Export PDF</button>
-      </div>
-      <div class="card">
-        <div class="card-title"><span class="card-title-left"><i class="ti ti-users"></i> Muster List</span>
-          <span id="emergency-count" style="font-size:13px;color:var(--text3)">0 visitors inside</span>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>#</th><th>Name</th><th>Company</th><th>Host / PIC</th><th>Check-in Time</th><th>Current Duration</th><th>Status</th></tr></thead>
-            <tbody id="emergency-table"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── QR SYSTEM ── -->
-    <div id="page-qr" style="display:none">
-      <div class="row2">
-        <div class="card">
-          <div class="card-title"><i class="ti ti-qrcode"></i> Generate QR Code</div>
-          <div class="form-group mb16">
-            <label>Select Visitor</label>
-            <select id="qr-visitor-select" onchange="showQR()">
-              <option value="">— Select visitor —</option>
-            </select>
-          </div>
-          <div class="qr-box" id="qr-box">
-            <div class="qr-img" id="qr-img-wrap">
-              <i class="ti ti-qrcode" style="font-size:60px;color:var(--border)"></i>
-            </div>
-            <div id="qr-visitor-name" style="font-weight:600;font-size:14px;color:var(--text)">—</div>
-            <div id="qr-visitor-id" class="mono" style="margin-top:4px;color:var(--text3)">—</div>
-            <div style="margin-top:12px;display:flex;gap:8px;justify-content:center">
-              <button class="btn btn-sm" onclick="printQR()"><i class="ti ti-printer"></i> Print</button>
-              <button class="btn btn-sm btn-primary" onclick="downloadQR()"><i class="ti ti-download"></i> Download</button>
-            </div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-title"><i class="ti ti-camera"></i> QR Scanner (Simulate)</div>
-          <p style="font-size:13px;color:var(--text3);margin-bottom:16px">Masukkan Visitor ID untuk simulasi scan QR.</p>
-          <div class="form-group mb16">
-            <label>Visitor ID</label>
-            <input type="text" id="qr-scan-input" placeholder="VIS-XXXXXXXX">
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-  <button class="btn btn-primary" onclick="qrCheckin()"><i class="ti ti-login"></i> Check In</button>
-  <button class="btn btn-success" onclick="qrCheckout()"><i class="ti ti-logout"></i> Check Out</button>
-  <button class="btn" onclick="qrLookup()"><i class="ti ti-search"></i> Lookup</button>
-</div>
-<div style="margin-top:12px;padding:10px;background:var(--green-light);border-radius:var(--radius-sm);font-size:12px;color:var(--green-text)">
-  <i class="ti ti-info-circle"></i> <strong>Security:</strong> Scan QR visitor → masukkan ID di atas → klik <strong>Check Out</strong> untuk proses keluar.
-</div>
-          <div id="qr-result" class="mt12"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── REPORTS ── -->
-    <div id="page-reports" style="display:none">
-      <div class="tabs">
-        <div class="tab active" onclick="switchTab('reports','daily',this)">Daily</div>
-        <div class="tab" onclick="switchTab('reports','weekly',this)">Weekly</div>
-        <div class="tab" onclick="switchTab('reports','monthly',this)">Monthly</div>
-        <div class="tab" onclick="switchTab('reports','freq',this)">Frequent Visitors</div>
-      </div>
-
-      <div id="report-daily" class="tab-pane active">
-        <div class="card">
-          <div class="card-title">
-            <span class="card-title-left"><i class="ti ti-calendar-day"></i> Daily Visitor Report</span>
-            <div class="flex-gap8">
-              <input type="date" id="report-date" style="width:160px" onchange="renderReportDaily()">
-              <button class="btn btn-sm" onclick="exportReport('daily')"><i class="ti ti-download"></i> Export CSV</button>
-            </div>
-          </div>
-          <div class="table-wrap"><table>
-            <thead><tr><th>#</th><th>Name</th><th>Company</th><th>Host</th><th>Purpose</th><th>Check-in</th><th>Check-out</th><th>Duration</th><th>Status</th></tr></thead>
-            <tbody id="report-daily-table"></tbody>
-          </table></div>
-        </div>
-      </div>
-
-      <div id="report-weekly" class="tab-pane">
-        <div class="card">
-          <div class="card-title"><span class="card-title-left"><i class="ti ti-calendar-week"></i> Weekly Summary</span></div>
-          <div id="weekly-chart" class="chart-bars"></div>
-          <div class="table-wrap mt12"><table>
-            <thead><tr><th>Day</th><th>Total Visitors</th><th>Checked Out</th><th>Still Inside</th></tr></thead>
-            <tbody id="weekly-table"></tbody>
-          </table></div>
-        </div>
-      </div>
-
-      <div id="report-monthly" class="tab-pane">
-        <div class="card">
-          <div class="card-title"><span class="card-title-left"><i class="ti ti-calendar-month"></i> Monthly Summary</span>
-            <select id="report-month" onchange="renderReportMonthly()" style="width:140px">
-            </select>
-          </div>
-          <div class="table-wrap"><table>
-            <thead><tr><th>Date</th><th>Total</th><th>Checked Out</th><th>Inside</th><th>Overstay</th></tr></thead>
-            <tbody id="monthly-table"></tbody>
-          </table></div>
-        </div>
-      </div>
-
-      <div id="report-freq" class="tab-pane">
-        <div class="card">
-          <div class="card-title"><span class="card-title-left"><i class="ti ti-repeat"></i> Most Frequent Visitors</span></div>
-          <div class="table-wrap"><table>
-            <thead><tr><th>Rank</th><th>Name</th><th>Company</th><th>Total Visits</th><th>Last Visit</th></tr></thead>
-            <tbody id="freq-table"></tbody>
-          </table></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── AUDIT TRAIL ── -->
-    <div id="page-audit" style="display:none">
-      <div class="search-wrap">
-        <div class="search-input-wrap">
-          <i class="ti ti-search"></i>
-          <input type="text" class="search-input" id="audit-search" placeholder="Search audit trail..." oninput="renderAudit()">
-        </div>
-        <select id="audit-filter" onchange="renderAudit()" style="width:160px">
-          <option value="">All Actions</option>
-          <option value="CHECK_IN">Check In</option>
-          <option value="CHECK_OUT">Check Out</option>
-          <option value="CREATE">Create</option>
-          <option value="UPDATE">Update</option>
-          <option value="DELETE">Delete</option>
-        </select>
-        <button class="btn btn-sm btn-danger" onclick="clearAudit()"><i class="ti ti-trash"></i> Clear All</button>
-      </div>
-      <div class="card" style="padding:0">
-        <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
-          <span style="font-size:13px;font-weight:500">Audit Log</span>
-          <span id="audit-count" style="font-size:12px;color:var(--text3);margin-left:8px">0 records</span>
-        </div>
-        <div style="padding:0 16px" id="audit-list"></div>
-      </div>
-    </div>
-
-  </div><!-- /content -->
-</div><!-- /main -->
-</div><!-- /app -->
-
-<!-- ════════ BOTTOM NAV (mobile) ════════ -->
-<nav class="bottom-nav" id="bottom-nav">
-  <div class="bn-item active" id="bn-dashboard" onclick="nav('dashboard',null);setBottomNav('dashboard')">
-    <i class="ti ti-layout-dashboard"></i>
-    <span>Dashboard</span>
-  </div>
-  <div class="bn-item" id="bn-visitors" onclick="nav('visitors',null);setBottomNav('visitors')">
-    <i class="ti ti-users"></i>
-    <span>Visitor</span>
-    <span class="bn-badge" id="bn-badge-visitors" style="display:none">0</span>
-  </div>
-  <div class="bn-item" id="bn-checkin" onclick="openModal('modal-select-type')">
-    <div style="width:46px;height:46px;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:-4px;box-shadow:0 4px 14px rgba(37,99,235,.4)">
-      <i class="ti ti-plus" style="font-size:24px;color:#fff"></i>
-    </div>
-    <span>Check In</span>
-  </div>
-  <div class="bn-item" id="bn-realtime" onclick="nav('realtime',null);setBottomNav('realtime')">
-    <i class="ti ti-activity"></i>
-    <span>Live</span>
-  </div>
-  <div class="bn-item" id="bn-more" onclick="toggleSidebar()">
-    <i class="ti ti-menu-2"></i>
-    <span>Menu</span>
-  </div>
-</nav>
-
-
-
-<!-- ════════ MODALS ════════ -->
-
-<!-- CHECK IN MODAL — GUEST -->
-<div class="modal-bg" id="modal-checkin-guest">
+<!-- MODAL CONFIRM -->
+<div class="modal-overlay" id="modal-confirm">
   <div class="modal">
-    <div class="modal-title">
-      <span><i class="ti ti-user" style="color:var(--blue);margin-right:8px"></i>Check In — Guest</span>
-      <button class="modal-close" onclick="closeModal('modal-checkin-guest')"><i class="ti ti-x"></i></button>
+    <div class="modal-title">Konfirmasi Checkout</div>
+    <div class="modal-sub">Apakah visitor berikut akan di-checkout sekarang?</div>
+    <div class="modal-visitor">
+      <div class="mv-name" id="modal-name">—</div>
+      <div class="mv-meta" id="modal-meta">—</div>
     </div>
-    <div class="form-grid">
-      <div class="form-group"><label>Nama Lengkap *</label><input type="text" id="g-name" placeholder="Nama lengkap"></div>
-      <div class="form-group"><label>Perusahaan / Instansi *</label><input type="text" id="g-company" placeholder="PT / CV / Instansi"></div>
-      <div class="form-group"><label>No. HP</label><input type="text" id="g-phone" placeholder="08xxxxxxxxxx"></div>
-      <div class="form-group"><label>No. KTP / Passport</label><input type="text" id="g-identity" placeholder="No. identitas"></div>
-      <div class="form-group full"><label>Tujuan Kunjungan *</label>
-        <select id="g-purpose">
-          <option value="">— Pilih tujuan —</option>
-          <option>Meeting / Rapat</option><option>Presentasi</option><option>Kunjungan Bisnis</option><option>Lainnya</option>
-        </select>
-      </div>
-      <div class="form-group"><label>Host / PIC *</label><input type="text" id="g-host" placeholder="Nama pegawai yang dikunjungi"></div>
-      <div class="form-group"><label>Department</label>
-        <select id="g-dept"><option value="">— Pilih dept —</option><option>Operation</option><option>HR / HRD</option><option>Maintenance</option><option>IT</option><option>Management</option><option>HSE</option><option>Security</option></select>
-      </div>
-      <div class="form-group full"><label>Catatan</label><textarea id="g-notes" placeholder="Catatan tambahan..."></textarea></div>
-      <div class="form-group full"><label>Status Awal</label>
-        <select id="g-status"><option value="Inside">Langsung Check In (Inside)</option><option value="Waiting Approval">Waiting Approval</option></select>
-      </div>
-    </div>
-    <div class="form-actions">
-      <button class="btn" onclick="closeModal('modal-checkin-guest')">Batal</button>
-      <button class="btn btn-primary" onclick="submitCheckinTyped('Guest')"><i class="ti ti-check"></i> Check In</button>
-    </div>
-  </div>
-</div>
-
-<!-- CHECK IN MODAL — CONTRACTOR -->
-<div class="modal-bg" id="modal-checkin-contractor">
-  <div class="modal" style="max-width:640px">
-    <div class="modal-title">
-      <span><i class="ti ti-hard-hat" style="color:var(--amber);margin-right:8px"></i>Check In — Contractor</span>
-      <button class="modal-close" onclick="closeModal('modal-checkin-contractor')"><i class="ti ti-x"></i></button>
-    </div>
-    <div class="form-grid">
-      <div class="form-group"><label>Nama Lengkap *</label><input type="text" id="con-name" placeholder="Nama lengkap"></div>
-      <div class="form-group"><label>Perusahaan Kontraktor *</label><input type="text" id="con-company" placeholder="Nama perusahaan kontraktor"></div>
-      <div class="form-group"><label>No. HP</label><input type="text" id="con-phone" placeholder="08xxxxxxxxxx"></div>
-      <div class="form-group"><label>No. KTP</label><input type="text" id="con-identity" placeholder="No. identitas"></div>
-
-      <div class="form-group"><label>Area Kerja *</label>
-        <select id="con-area">
-          <option value="">— Pilih area —</option>
-          <option>CTP-1</option><option>CTP-2</option><option>Cold Storage</option>
-          <option>Peanut</option><option>PS Drier</option><option>SPR Drier</option>
-          <option>Utility</option><option>HSE</option>
-        </select>
-      </div>
-      <div class="form-group"><label>Jenis Pekerjaan *</label>
-        <select id="con-purpose">
-          <option value="">— Pilih jenis —</option>
-          <option>Civil</option><option>Electric</option><option>Mechanic</option><option>HR</option>
-        </select>
-      </div>
-      <div class="form-group"><label>Jumlah Personil *</label>
-        <input type="number" id="con-personil" placeholder="0" min="1" max="999"
-          oninput="this.value=this.value.replace(/[^0-9]/g,'')">
-      </div>
-      <div class="form-group"><label>No. SPK / PO</label><input type="text" id="con-spk" placeholder="Nomor SPK atau PO"></div>
-
-      <div class="form-group"><label>Host / PIC *</label><input type="text" id="con-host" placeholder="Nama PIC internal"></div>
-      <div class="form-group"><label>Department</label>
-        <select id="con-dept"><option value="">— Pilih dept —</option><option>Operation</option><option>HR / HRD</option><option>Maintenance</option><option>IT</option><option>Management</option><option>HSE</option><option>Security</option></select>
-      </div>
-      <div class="form-group"><label>Tanggal Mulai</label><input type="date" id="con-start"></div>
-      <div class="form-group"><label>Tanggal Selesai</label><input type="date" id="con-end"></div>
-
-      <!-- PERALATAN DIBAWA -->
-      <div class="form-group full">
-        <label>Peralatan Dibawa</label>
-        <div id="con-equipment-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
-        <button type="button" class="btn btn-sm" onclick="addEquipmentRow()">
-          <i class="ti ti-plus"></i> Tambah Peralatan
-        </button>
-      </div>
-
-      <div class="form-group full"><label>Catatan</label><textarea id="con-notes" placeholder="Catatan tambahan..."></textarea></div>
-      <div class="form-group full"><label>Status Awal</label>
-        <select id="con-status">
-          <option value="Inside">Langsung Check In (Inside)</option>
-          <option value="Waiting Approval">Waiting Approval</option>
-        </select>
-      </div>
-    </div>
-    <div class="form-actions">
-      <button class="btn" onclick="closeModal('modal-checkin-contractor')">Batal</button>
-      <button class="btn btn-primary" onclick="submitCheckinTyped('Contractor')"><i class="ti ti-check"></i> Check In</button>
-    </div>
-  </div>
-</div>
-
-<!-- CHECK IN MODAL — DRIVER -->
-<div class="modal-bg" id="modal-checkin-driver">
-  <div class="modal">
-    <div class="modal-title">
-      <span><i class="ti ti-truck" style="color:var(--green);margin-right:8px"></i>Check In — Driver</span>
-      <button class="modal-close" onclick="closeModal('modal-checkin-driver')"><i class="ti ti-x"></i></button>
-    </div>
-    <div class="form-grid">
-      <div class="form-group"><label>Nama Driver *</label><input type="text" id="drv-name" placeholder="Nama lengkap driver"></div>
-      <div class="form-group"><label>Perusahaan</label><input type="text" id="drv-company" placeholder="Nama perusahaan / ekspedisi"></div>
-      <div class="form-group"><label>No. HP</label><input type="text" id="drv-phone" placeholder="08xxxxxxxxxx"></div>
-      <div class="form-group"><label>No. KTP</label><input type="text" id="drv-identity" placeholder="No. identitas"></div>
-      <div class="form-group"><label>No. Polisi Kendaraan *</label><input type="text" id="drv-plate" placeholder="B 1234 XX"></div>
-      <div class="form-group"><label>Jenis Kendaraan *</label>
-        <select id="drv-vehicle">
-          <option value="">— Pilih jenis —</option>
-          <option>Truk Box</option><option>Truk Fuso</option><option>Pickup</option><option>Mobil Pribadi</option><option>Motor</option><option>Lainnya</option>
-        </select>
-      </div>
-      <div class="form-group full"><label>Muatan / Cargo</label><input type="text" id="drv-cargo" placeholder="Isi muatan kendaraan"></div>
-      <div class="form-group"><label>Tujuan *</label>
-        <select id="drv-purpose">
-          <option value="">— Pilih tujuan —</option>
-          <option>Loading</option><option>Unloading</option><option>Loading + Unloading</option><option>Reject Basah</option><option>Reject Kering</option><option>Reject Janggel</option><option>Reject Tumpi Bagus</option><option>Reject Tumpi Jelek</option><option>B3</option><option>Limbah Umum</option>
-        </select>
-      </div>
-      <div class="form-group"><label>Host / PIC *</label><input type="text" id="drv-host" placeholder="Nama PIC internal"></div>
-      <div class="form-group full"><label>Catatan</label><textarea id="drv-notes" placeholder="Catatan tambahan..."></textarea></div>
-      <div class="form-group full"><label>Status Awal</label>
-        <select id="drv-status"><option value="Inside">Langsung Check In (Inside)</option><option value="Waiting Approval">Waiting Approval</option></select>
-      </div>
-    </div>
-    <div class="form-actions">
-      <button class="btn" onclick="closeModal('modal-checkin-driver')">Batal</button>
-      <button class="btn btn-primary" onclick="submitCheckinTyped('Driver')"><i class="ti ti-check"></i> Check In</button>
-    </div>
-  </div>
-</div>
-
-<!-- CHECK IN MODAL — EMPLOYEE TEST -->
-<div class="modal-bg" id="modal-checkin-employee">
-  <div class="modal">
-    <div class="modal-title">
-      <span><i class="ti ti-id-badge" style="color:var(--navy3);margin-right:8px"></i>Check In — Employee Test</span>
-      <button class="modal-close" onclick="closeModal('modal-checkin-employee')"><i class="ti ti-x"></i></button>
-    </div>
-    <div class="form-grid">
-      <div class="form-group"><label>Nama Lengkap *</label><input type="text" id="emp-name" placeholder="Nama lengkap"></div>
-      <div class="form-group"><label>Dept / Divisi *</label>
-        <select id="emp-dept"><option value="">— Pilih dept —</option><option>Operation</option><option>HR / HRD</option><option>Maintenance</option><option>IT</option><option>Management</option><option>HSE</option><option>Security</option></select>
-      </div>
-      <div class="form-group"><label>Jabatan</label><input type="text" id="emp-jabatan" placeholder="Jabatan / posisi"></div>
-      <div class="form-group full"><label>Keperluan *</label>
-        <select id="emp-purpose">
-          <option value="">— Pilih keperluan —</option>
-          <option>Tes Kompetensi</option><option>Tes Kesehatan</option><option>Orientasi Karyawan Baru</option><option>Pelatihan Internal</option><option>Lainnya</option>
-        </select>
-      </div>
-      <div class="form-group"><label>PIC / Supervisor *</label><input type="text" id="emp-host" placeholder="Nama supervisor / PIC"></div>
-      <div class="form-group full"><label>Catatan</label><textarea id="emp-notes" placeholder="Catatan tambahan..."></textarea></div>
-      <div class="form-group full"><label>Status Awal</label>
-        <select id="emp-status"><option value="Inside">Langsung Check In (Inside)</option><option value="Waiting Approval">Waiting Approval</option></select>
-      </div>
-    </div>
-    <div class="form-actions">
-      <button class="btn" onclick="closeModal('modal-checkin-employee')">Batal</button>
-      <button class="btn btn-primary" onclick="submitCheckinTyped('Employee Test')"><i class="ti ti-check"></i> Check In</button>
-    </div>
-  </div>
-</div>
-
-<!-- CHECK IN MODAL — AUDITOR -->
-<div class="modal-bg" id="modal-checkin-auditor">
-  <div class="modal">
-    <div class="modal-title">
-      <span><i class="ti ti-clipboard-check" style="color:var(--red);margin-right:8px"></i>Check In — Auditor</span>
-      <button class="modal-close" onclick="closeModal('modal-checkin-auditor')"><i class="ti ti-x"></i></button>
-    </div>
-    <div class="form-grid">
-      <div class="form-group"><label>Nama Lengkap *</label><input type="text" id="aud-name" placeholder="Nama lengkap"></div>
-      <div class="form-group"><label>Instansi / Lembaga *</label><input type="text" id="aud-company" placeholder="Nama instansi / lembaga audit"></div>
-      <div class="form-group"><label>No. HP</label><input type="text" id="aud-phone" placeholder="08xxxxxxxxxx"></div>
-      <div class="form-group"><label>No. KTP</label><input type="text" id="aud-identity" placeholder="No. identitas"></div>
-      <div class="form-group"><label>Jenis Audit *</label>
-        <select id="aud-audittype">
-          <option value="">— Pilih jenis audit —</option>
-          <option>Audit Internal</option><option>Audit Eksternal</option><option>Audit ISO</option><option>Audit Pemerintah</option><option>Audit Pelanggan</option><option>Lainnya</option>
-        </select>
-      </div>
-      <div class="form-group"><label>Scope Audit</label><input type="text" id="aud-scope" placeholder="Ruang lingkup audit"></div>
-      <div class="form-group"><label>Host / PIC *</label><input type="text" id="aud-host" placeholder="Nama PIC internal"></div>
-      <div class="form-group"><label>Department</label>
-        <select id="aud-dept"><option value="">— Pilih dept —</option><option>Operation</option><option>HR / HRD</option><option>Maintenance</option><option>IT</option><option>Management</option><option>HSE</option><option>Security</option></select>
-      </div>
-      <div class="form-group full"><label>No. Surat Tugas</label><input type="text" id="aud-surat" placeholder="Nomor surat tugas / assignment letter"></div>
-      <div class="form-group full"><label>Catatan</label><textarea id="aud-notes" placeholder="Catatan tambahan..."></textarea></div>
-      <div class="form-group full"><label>Status Awal</label>
-        <select id="aud-status"><option value="Inside">Langsung Check In (Inside)</option><option value="Waiting Approval">Waiting Approval</option></select>
-      </div>
-    </div>
-    <div class="form-actions">
-      <button class="btn" onclick="closeModal('modal-checkin-auditor')">Batal</button>
-      <button class="btn btn-primary" onclick="submitCheckinTyped('Auditor')"><i class="ti ti-check"></i> Check In</button>
-    </div>
-  </div>
-</div>
-<!-- DRIVER APPROVAL MODAL -->
-<div class="modal-bg" id="modal-driver-approval">
-  <div class="modal" style="max-width:480px">
-    <div class="modal-title">
-      <span><i class="ti ti-truck" style="color:var(--green);margin-right:8px"></i>Driver — Approval Keluar</span>
-      <button class="modal-close" onclick="closeModal('modal-driver-approval')"><i class="ti ti-x"></i></button>
-    </div>
-    <div id="driver-approval-content"></div>
-    <div class="form-actions" id="driver-approval-actions"></div>
-  </div>
-</div>
-<!-- MODAL PILIH TIPE CHECK IN -->
-<div class="modal-bg" id="modal-select-type">
-  <div class="modal" style="max-width:420px">
-    <div class="modal-title">
-      <span><i class="ti ti-user-plus" style="color:var(--blue);margin-right:8px"></i>Pilih Tipe Pengunjung</span>
-      <button class="modal-close" onclick="closeModal('modal-select-type')"><i class="ti ti-x"></i></button>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-bottom:8px">
-      <button class="btn" style="flex-direction:column;padding:16px;gap:6px;height:auto" onclick="closeModal('modal-select-type');openModal('modal-checkin-guest')">
-        <i class="ti ti-user" style="font-size:24px;color:var(--blue)"></i>
-        <span style="font-size:13px;font-weight:600">Guest</span>
-      </button>
-      <button class="btn" style="flex-direction:column;padding:16px;gap:6px;height:auto" onclick="closeModal('modal-select-type');openModal('modal-checkin-contractor')">
-        <i class="ti ti-hard-hat" style="font-size:24px;color:var(--amber)"></i>
-        <span style="font-size:13px;font-weight:600">Contractor</span>
-      </button>
-      <button class="btn" style="flex-direction:column;padding:16px;gap:6px;height:auto" onclick="closeModal('modal-select-type');openModal('modal-checkin-driver')">
-        <i class="ti ti-truck" style="font-size:24px;color:var(--green)"></i>
-        <span style="font-size:13px;font-weight:600">Driver</span>
-      </button>
-      <button class="btn" style="flex-direction:column;padding:16px;gap:6px;height:auto" onclick="closeModal('modal-select-type');openModal('modal-checkin-employee')">
-        <i class="ti ti-id-badge" style="font-size:24px;color:var(--navy3)"></i>
-        <span style="font-size:13px;font-weight:600">Employee Test</span>
-      </button>
-      <button class="btn" style="grid-column:1/-1;flex-direction:column;padding:16px;gap:6px;height:auto" onclick="closeModal('modal-select-type');openModal('modal-checkin-auditor')">
-        <i class="ti ti-clipboard-check" style="font-size:24px;color:var(--red)"></i>
-        <span style="font-size:13px;font-weight:600">Auditor</span>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Batal</button>
+      <button class="btn-confirm-checkout" onclick="confirmCheckout()">
+        <i class="ti ti-logout"></i> Checkout
       </button>
     </div>
   </div>
 </div>
 
-<!-- EQUIPMENT MODAL -->
-<div class="modal-bg" id="modal-equipment">
-  <div class="modal">
-    <div class="modal-title">
-      <span><i class="ti ti-package" style="color:var(--blue);margin-right:8px"></i>Add Equipment</span>
-      <button class="modal-close" onclick="closeModal('modal-equipment')"><i class="ti ti-x"></i></button>
+<!-- HEADER -->
+<div class="header">
+  <div class="header-top">
+    <div class="header-logo">
+      <img src="data:image/png;base64,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" alt="Prasad Seeds" style="height:22px;width:auto;">
     </div>
-    <div class="form-grid">
-      <div class="form-group">
-        <label>Equipment Name *</label>
-        <input type="text" id="eq-name" placeholder="Nama equipment">
-      </div>
-      <div class="form-group">
-        <label>Serial Number</label>
-        <input type="text" id="eq-serial" placeholder="SN-XXXX">
-      </div>
-      <div class="form-group">
-        <label>Owner / Pembawa *</label>
-        <input type="text" id="eq-owner" placeholder="Nama pembawa">
-      </div>
-      <div class="form-group">
-        <label>Gate Pass Number</label>
-        <input type="text" id="eq-gatepass" placeholder="GP-YYYYMMDD-XXX">
-      </div>
-      <div class="form-group">
-        <label>Condition / Kondisi</label>
-        <select id="eq-condition">
-          <option>Good / Baik</option>
-          <option>Minor scratch</option>
-          <option>Damaged</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Status</label>
-        <select id="eq-status">
-          <option value="Inside">Inside (Dibawa masuk)</option>
-          <option value="Pending Approval">Pending Approval</option>
-          <option value="Outside">Outside (Dibawa keluar)</option>
-        </select>
-      </div>
-      <div class="form-group full">
-        <label>Notes</label>
-        <textarea id="eq-notes" placeholder="Catatan equipment..."></textarea>
-      </div>
+    <div class="header-info">
+      <div class="header-title">Visitor Checkout</div>
+      <div class="header-sub">PT Prasad Seeds Indonesia</div>
     </div>
-    <div class="form-actions">
-      <button class="btn" onclick="closeModal('modal-equipment')">Batal</button>
-      <button class="btn btn-primary" onclick="submitEquipment()"><i class="ti ti-check"></i> Save</button>
-    </div>
+    <div class="header-badge"><i class="ti ti-shield-check"></i> Security</div>
   </div>
 </div>
 
-<!-- VISITOR DETAIL MODAL -->
-<div class="modal-bg" id="modal-detail">
-  <div class="modal" style="max-width:640px">
-    <div class="modal-title">
-      <span><i class="ti ti-id-badge-2" style="color:var(--blue);margin-right:8px"></i>Visitor Detail</span>
-      <button class="modal-close" onclick="closeModal('modal-detail')"><i class="ti ti-x"></i></button>
-    </div>
-    <div id="modal-detail-content"></div>
-    <div class="form-actions" id="modal-detail-actions"></div>
-  </div>
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab-btn active" id="tab-scan-btn" onclick="switchTab('scan')">
+    <i class="ti ti-qrcode"></i> Scan QR
+  </button>
+  <button class="tab-btn" id="tab-manual-btn" onclick="switchTab('manual')">
+    <i class="ti ti-keyboard"></i> Manual
+  </button>
+  <button class="tab-btn" id="tab-list-btn" onclick="switchTab('list')">
+    <i class="ti ti-users"></i> Daftar
+  </button>
 </div>
 
-<!-- TOAST CONTAINER -->
-<div id="toast-container"></div>
+<!-- BODY -->
+<div class="body">
 
-<style>
-/* ── EQUIPMENT ROW ── */
-.equip-row {
-  display: grid; grid-template-columns: 1fr 72px 36px;
-  gap: 8px; align-items: center;
-}
-.equip-row input { margin: 0; }
-.btn-remove-equip {
-  width: 36px; height: 36px; border-radius: var(--radius-sm);
-  background: var(--red-light); border: 1px solid var(--red-light);
-  color: var(--red); display: flex; align-items: center; justify-content: center;
-  cursor: pointer; font-size: 15px; flex-shrink: 0; transition: background .14s;
-}
-.btn-remove-equip:hover { background: var(--red); color: #fff; }
+  <!-- TAB: SCAN QR -->
+  <div class="tab-panel active" id="tab-scan">
+    <div class="info-banner">
+      <i class="ti ti-info-circle"></i>
+      <div>Arahkan kamera ke QR Code visitor, atau gunakan tab <strong>Manual</strong> untuk input Visitor ID secara manual.</div>
+    </div>
 
-/* ── SLA BADGE ── */
-.sla-badge {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 4px 10px; border-radius: 20px;
-  font-size: 11px; font-weight: 700;
-  font-family: 'DM Mono', monospace;
-}
-.sla-ok   { background: var(--green-light); color: var(--green-text); }
-.sla-warn { background: var(--amber-light); color: var(--amber-text); }
-.sla-over { background: var(--red-light);   color: var(--red-text); }
+    <div class="scan-box" id="scan-box">
+      <div class="scan-icon" id="scan-idle-icon">
+        <i class="ti ti-qrcode"></i>
+      </div>
+      <div class="scan-title" id="scan-box-title">Siap Scan QR</div>
+      <div class="scan-sub" id="scan-box-sub">Tekan tombol di bawah untuk mengaktifkan kamera dan scan QR Code visitor.</div>
 
-/* ── DRIVER APPROVAL STEP ── */
-.approval-step {
-  display: flex; align-items: flex-start; gap: 12px;
-  padding: 12px; border-radius: var(--radius);
-  border: 1.5px solid var(--border); margin-bottom: 10px;
-}
-.approval-step-icon {
-  width: 36px; height: 36px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; font-size: 18px;
-}
-.step-done { background: var(--green-light); color: var(--green); }
-.step-pend { background: var(--amber-light); color: var(--amber); }
-.step-lock { background: var(--gray-light);  color: var(--gray); }
+      <div class="viewfinder hidden" id="viewfinder">
+        <video id="qr-video" playsinline autoplay muted></video>
+        <canvas id="qr-canvas" style="display:none"></canvas>
+        <div class="vf-overlay">
+          <div style="position:relative">
+            <div class="vf-frame"></div>
+            <div class="scan-line"></div>
+          </div>
+        </div>
+      </div>
 
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-</style>
+      <button class="btn-scan" id="btn-scan-toggle" onclick="toggleScan()">
+        <i class="ti ti-camera" id="scan-btn-icon"></i>
+        <span id="scan-btn-label">Aktifkan Kamera</span>
+      </button>
+    </div>
+
+    <div id="scan-result"></div>
+  </div>
+
+  <!-- TAB: MANUAL -->
+  <div class="tab-panel" id="tab-manual">
+    <div class="manual-box">
+      <div class="box-label"><i class="ti ti-search"></i> Cari Visitor</div>
+      <div class="field" id="f-vid">
+        <label>Visitor ID</label>
+        <input type="text" id="inp-vid" placeholder="VIS-XXXXXXXX" autocomplete="off" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+        <div class="field-hint">Contoh: VIS-A1B2C3D4</div>
+        <div class="field-error">Visitor ID tidak ditemukan</div>
+      </div>
+      <button class="btn-search" onclick="searchByID()">
+        <i class="ti ti-search"></i> Cari Visitor
+      </button>
+    </div>
+    <div id="manual-result"></div>
+  </div>
+
+  <!-- TAB: DAFTAR AKTIF -->
+  <div class="tab-panel" id="tab-list">
+    <div class="list-header">
+      <div class="list-title">Visitor Aktif Hari Ini</div>
+      <div class="list-count" id="active-count">0</div>
+    </div>
+    <div id="visitor-list-container"></div>
+  </div>
+
+</div>
 
 <script>
-// ══════════════════════════════════════════
-//  GAS INTEGRATION
-// ══════════════════════════════════════════
- 
-// Ganti dengan URL Web App hasil Deploy di Google Apps Script
+// ── CONFIG ──
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbykfv9j6MHlGZK2chWzIE97KL38cVC7JoEdIl8dJXaIQXHusmVSkq40iAVM0ZPW3awq/exec';
- 
-async function sendToGAS(action, data) {
-  if (!GAS_URL) return { ok: false };
-  try {
-    // Gunakan no-cors — GAS tidak support CORS dari browser langsung.
-    // Response akan selalu opaque, jadi kita anggap ok kalau tidak throw.
-    await fetch(GAS_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, data }),
-    });
-    return { ok: true }; // no-cors selalu resolve tanpa throw = sukses
-  } catch (err) {
-    console.warn('[GAS] Gagal kirim:', action, err.message);
-    return { ok: false, error: err.message };
-  }
-}
 
-// Helper: kirim log ke sheet Logs secara otomatis
-function sendLogToGAS(action, entity, detail) {
-  sendToGAS('ADD_LOG', {
-    action, entity, detail,
-    user: document.getElementById('sb-uname')?.textContent || 'System',
-    ts: now(),
-  });
-}
- 
-// ══════════════════════════════════════════
-//  DATA LAYER — localStorage
-// ══════════════════════════════════════════
- 
-const DB = {
-
-  get: (k) => JSON.parse(localStorage.getItem('vsm_'+k) || '[]'),
-  set: (k, v) => localStorage.setItem('vsm_'+k, JSON.stringify(v)),
-  // collections
-  visitors: () => DB.get('visitors'),
-  setVisitors: (v) => DB.set('visitors', v),
-  equipment: () => DB.get('equipment'),
-  setEquipment: (v) => DB.set('equipment', v),
-  alerts: () => DB.get('alerts'),
-  setAlerts: (v) => DB.set('alerts', v),
-  audit: () => DB.get('audit'),
-  setAudit: (v) => DB.set('audit', v),
+// ── TYPE CONFIG ──
+const typeConfig = {
+  'Guest':          { icon: 'ti-user',            color: '#60a5fa', bg: '#eff6ff' },
+  'Contractor':     { icon: 'ti-hard-hat',        color: '#fbbf24', bg: '#fffbeb' },
+  'Driver':         { icon: 'ti-truck',           color: '#34d399', bg: '#f0fdf4' },
+  'Employee Test':  { icon: 'ti-id-badge',        color: '#a78bfa', bg: '#faf5ff' },
+  'Auditor':        { icon: 'ti-clipboard-check', color: '#f87171', bg: '#fff1f2' },
 };
-
-function genId(prefix) {
-  return prefix + '-' + Math.random().toString(36).substr(2,8).toUpperCase();
+function getTypeCfg(t) {
+  return typeConfig[t] || { icon: 'ti-user', color: '#6b7280', bg: '#f3f4f6' };
 }
 
-function genGatePass() {
-  const d = new Date();
-  const ds = d.getFullYear().toString() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
-  const existing = DB.equipment().filter(e => e.gatePass && e.gatePass.startsWith('GP-'+ds));
-  const num = String(existing.length + 1).padStart(3,'0');
-  return 'GP-' + ds + '-' + num;
-}
+// ── STORAGE (with fallback) ──
+const _mem = {};
+const DB = {
+  get: (k) => {
+    try { return JSON.parse(localStorage.getItem('vsm_'+k)||'[]'); } catch(e){}
+    try { return JSON.parse(sessionStorage.getItem('vsm_'+k)||'[]'); } catch(e){}
+    return _mem['vsm_'+k]||[];
+  },
+  set: (k,v) => {
+    try { localStorage.setItem('vsm_'+k,JSON.stringify(v)); return; } catch(e){}
+    try { sessionStorage.setItem('vsm_'+k,JSON.stringify(v)); return; } catch(e){}
+    _mem['vsm_'+k]=v;
+  },
+  visitors:    ()  => DB.get('visitors'),
+  setVisitors: (v) => DB.set('visitors',v),
+};
 
 function now() { return new Date().toISOString(); }
-
-function fmtDate(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'});
-}
-
 function fmtTime(iso) {
   if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+  return new Date(iso).toLocaleString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function elapsed(iso) {
+  if (!iso) return '';
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 60) return m + ' mnt';
+  const h = Math.floor(m/60), rm = m%60;
+  return h + 'j ' + rm + 'mnt';
+}
+function todayStr() {
+  return new Date().toISOString().slice(0,10);
 }
 
-function fmtDateTime(iso) {
-  if (!iso) return '—';
-  return fmtDate(iso) + ' ' + fmtTime(iso);
-}
+// ── STATE ──
+let scanning      = false;
+let scanStream    = null;
+let scanInterval  = null;
+let pendingEntry  = null;
+let currentEntry  = null;
 
-function fmtDuration(startIso, endIso) {
-  const start = new Date(startIso);
-  const end = endIso ? new Date(endIso) : new Date();
-  const diff = Math.floor((end - start) / 1000);
-  if (diff < 0) return '00:00:00';
-  const h = Math.floor(diff / 3600);
-  const m = Math.floor((diff % 3600) / 60);
-  const s = diff % 60;
-  return [h,m,s].map(v=>String(v).padStart(2,'0')).join(':');
-}
-
-function durationSecs(startIso, endIso) {
-  const start = new Date(startIso);
-  const end = endIso ? new Date(endIso) : new Date();
-  return Math.floor((end - start) / 1000);
-}
-
-function isToday(iso) {
-  if (!iso) return false;
-  const d = new Date(iso);
-  const t = new Date();
-  return d.getDate() === t.getDate() && d.getMonth() === t.getMonth() && d.getFullYear() === t.getFullYear();
-}
-
-// AUDIT LOG
-function addAudit(action, entity, detail, oldVal, newVal) {
-  const logs = DB.audit();
-  logs.unshift({
-    id: genId('AUD'),
-    action,
-    entity,
-    detail,
-    user: document.getElementById('sb-uname').textContent,
-    ts: now(),
-    oldVal: oldVal || '',
-    newVal: newVal || '',
+// ── TABS ──
+function switchTab(tab) {
+  ['scan','manual','list'].forEach(t => {
+    document.getElementById('tab-'+t).classList.toggle('active', t===tab);
+    document.getElementById('tab-'+t+'-btn').classList.toggle('active', t===tab);
   });
-  // keep last 500
-  DB.setAudit(logs.slice(0, 500));
+  if (tab === 'list') renderActiveList();
+  if (tab !== 'scan') stopScan();
 }
 
-// ══════════════════════════════════════════
-//  SEED DATA
-// ══════════════════════════════════════════
-function seedIfEmpty() {
-  if (DB.visitors().length === 0) {
-    const base = new Date();
-    const visitors = [
-      { id: genId('VIS'), name: 'Budi Santoso', company: 'CV Maju Jaya', phone: '081234567890', identity: '3201010101800001', purpose: 'Meeting / Rapat', host: 'R. Wahyu', dept: 'Production', notes: '', status: 'Inside', checkIn: new Date(base.getTime() - 2*3600*1000 - 14*60*1000).toISOString(), checkOut: null, createdAt: now() },
-      { id: genId('VIS'), name: 'Siti Rahayu', company: 'PT Karya Utama', phone: '081298765432', identity: '3201010202850002', purpose: 'Audit / Inspeksi', host: 'Ibu Dian', dept: 'HR / HRD', notes: 'Audit internal', status: 'Inside', checkIn: new Date(base.getTime() - 45*60*1000).toISOString(), checkOut: null, createdAt: now() },
-      { id: genId('VIS'), name: 'Dedi Kurniawan', company: 'Solo Tech', phone: '082112345678', identity: '3201010303780003', purpose: 'Maintenance / Servis', host: 'Pak Hendra', dept: 'IT', notes: '', status: 'Overstay', checkIn: new Date(base.getTime() - 5*3600*1000).toISOString(), checkOut: null, createdAt: now() },
-      { id: genId('VIS'), name: 'Rina Marlina', company: 'Audit Co', phone: '085612345678', identity: '3201010404900004', purpose: 'Audit / Inspeksi', host: 'Ibu Sari', dept: 'Finance', notes: '', status: 'Waiting Approval', checkIn: new Date(base.getTime() - 20*60*1000).toISOString(), checkOut: null, createdAt: now() },
-      { id: genId('VIS'), name: 'Agus Prasetyo', company: 'Supplier Jaya', phone: '08761234567', identity: '3201010505750005', purpose: 'Delivery / Pengiriman', host: 'Pak Joko', dept: 'Procurement', notes: 'Delivery spare parts', status: 'Checked Out', checkIn: new Date(base.getTime() - 3*3600*1000).toISOString(), checkOut: new Date(base.getTime() - 1*3600*1000).toISOString(), createdAt: now() },
-    ];
-    DB.setVisitors(visitors);
-    addAudit('SEED','SYSTEM','Initial seed data loaded');
-  }
-  if (DB.equipment().length === 0) {
-    const equipment = [
-      { id: genId('EQ'), name: 'Laptop Dell XPS', serial: 'SN-4821-DX', owner: 'Budi Santoso', gatePass: 'GP-20240604-001', condition: 'Good / Baik', notes: '', status: 'Inside', dateIn: now(), dateOut: null },
-      { id: genId('EQ'), name: 'Oscilloscope', serial: 'OSC-2024-007', owner: 'Dedi Kurniawan', gatePass: 'GP-20240604-002', condition: 'Minor scratch', notes: 'Ada goresan kecil di sisi kiri', status: 'Inside', dateIn: now(), dateOut: null },
-      { id: genId('EQ'), name: 'DSLR Camera', serial: 'CAM-N90-2023', owner: 'Rina Marlina', gatePass: 'GP-20240604-003', condition: 'Good / Baik', notes: '', status: 'Pending Approval', dateIn: now(), dateOut: null },
-    ];
-    DB.setEquipment(equipment);
-  }
-  checkAlerts();
-}
+// ── QR SCAN ──
+async function toggleScan() {
+  if (scanning) { stopScan(); return; }
+  const vf      = document.getElementById('viewfinder');
+  const video   = document.getElementById('qr-video');
+  const btnIcon = document.getElementById('scan-btn-icon');
+  const btnLbl  = document.getElementById('scan-btn-label');
+  const btn     = document.getElementById('btn-scan-toggle');
 
-// ══════════════════════════════════════════
-//  ALERTS ENGINE
-// ══════════════════════════════════════════
-function checkAlerts() {
-  const visitors = DB.visitors();
-  const equipment = DB.equipment();
-  const existAlerts = DB.alerts();
-  const newAlerts = [];
-
-  visitors.filter(v => v.status === 'Inside' || v.status === 'Overstay').forEach(v => {
-    const secs = durationSecs(v.checkIn);
-    if (secs > 4 * 3600) {
-      // mark as overstay
-      v.status = 'Overstay';
-      const exists = existAlerts.find(a => a.ref === v.id && a.type === 'OVERSTAY');
-      if (!exists) {
-        newAlerts.push({ id: genId('ALT'), type: 'OVERSTAY', severity: 'High', ref: v.id, message: `Visitor overstay: ${v.name}`, detail: `${v.company} — sudah ${fmtDuration(v.checkIn)} di dalam pabrik`, ts: now(), resolved: false });
-      }
-    }
-  });
-  DB.setVisitors(visitors);
-
-  // Keep old + new unique
-  const merged = [...existAlerts];
-  newAlerts.forEach(a => {
-    if (!merged.find(x => x.ref === a.ref && x.type === a.type)) merged.unshift(a);
-  });
-  DB.setAlerts(merged.slice(0, 100));
-
-  // Update badge
-  const unresolvedCount = merged.filter(a => !a.resolved).length;
-  document.getElementById('badge-alerts').textContent = unresolvedCount;
-  document.getElementById('badge-alerts').style.display = unresolvedCount > 0 ? '' : 'none';
-}
-
-// ══════════════════════════════════════════
-//  NAVIGATION
-// ══════════════════════════════════════════
-const pageTitles = {
-  dashboard: ['Dashboard Overview', 'Live monitoring · Real-time'],
-  visitors: ['Visitor Management', 'Kelola check-in dan check-out visitor'],
-  equipment: ['Equipment Management', 'Rekam pergerakan equipment masuk/keluar'],
-  realtime: ['Real-time Monitor', 'Pantau visitor aktif secara langsung'],
-  alerts: ['Alert Management', 'Overstay · Equipment not returned · Unauthorized movement'],
-  emergency: ['Emergency Dashboard', 'Muster list semua visitor di dalam pabrik'],
-  qr: ['QR Code System', 'Generate dan scan QR visitor'],
-  reports: ['Reports & Analytics', 'Laporan harian, mingguan, bulanan'],
-  audit: ['Audit Trail', 'Log semua aktivitas sistem'],
-};
-
-let currentPage = 'dashboard';
-let currentVisitorType = 'all';
-let sidebarOpen = false;
-
-function toggleSidebar() {
-  sidebarOpen = !sidebarOpen;
-  const sidebar = document.getElementById('sidebar');
-  const overlay = document.getElementById('sb-overlay');
-  const main = document.querySelector('.main');
-
-  sidebar.classList.toggle('open', sidebarOpen);
-  overlay.classList.toggle('show', sidebarOpen);
-
-  const isMobile = window.innerWidth <= 768;
-  if (!isMobile) {
-    main.classList.toggle('pushed', sidebarOpen);
-  } else {
-    main.classList.remove('pushed');
-    document.body.style.overflow = sidebarOpen ? 'hidden' : '';
-  }
-
-  const toggleBtn = document.getElementById('sb-toggle');
-  if (toggleBtn) toggleBtn.classList.toggle('open', sidebarOpen);
-  const toggleIcon = document.getElementById('sb-toggle-icon');
-  if (toggleIcon) toggleIcon.className = sidebarOpen ? 'ti ti-x' : 'ti ti-menu-2';
-
-  if (sidebarOpen) {
-    history.pushState({ sidebarOpen: true, page: currentPage }, '', '#sidebar');
-  }
-}
-
-// nav() didefinisikan ulang di bagian bawah via History API section
-
-function renderPage(page) {
-  if (page === 'dashboard') renderDashboard();
-  if (page === 'visitors') renderVisitorTable();
-  if (page === 'equipment') renderEquipmentTable();
-  if (page === 'realtime') renderRealtime();
-  if (page === 'alerts') { checkAlerts(); renderAlerts(); }
-  if (page === 'emergency') renderEmergency();
-  if (page === 'qr') renderQR();
-  if (page === 'reports') { initReports(); renderReportDaily(); }
-  if (page === 'audit') renderAudit();
-}
-
-// ══════════════════════════════════════════
-//  TABS
-// ══════════════════════════════════════════
-const tabFilters = {};
-
-function switchTab(group, val, el) {
-  tabFilters[group] = val;
-  el.closest('.tabs').querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
-  if (group === 'visitors') renderVisitorTable();
-  if (group === 'equipment') renderEquipmentTable();
-  if (group === 'reports') {
-    document.querySelectorAll('#page-reports .tab-pane').forEach(p => p.classList.remove('active'));
-    document.getElementById('report-' + val).classList.add('active');
-    if (val === 'daily') renderReportDaily();
-    if (val === 'weekly') renderReportWeekly();
-    if (val === 'monthly') renderReportMonthly();
-    if (val === 'freq') renderFreqVisitors();
-  }
-}
-
-// ══════════════════════════════════════════
-//  DASHBOARD
-// ══════════════════════════════════════════
-function renderDashboard() {
-  const visitors = DB.visitors();
-  const equipment = DB.equipment();
-  checkAlerts();
-
-  const inside = visitors.filter(v => v.status === 'Inside' || v.status === 'Overstay').length;
-  const overstay = visitors.filter(v => v.status === 'Overstay').length;
-  const todayV = visitors.filter(v => isToday(v.checkIn)).length;
-  const equipInside = equipment.filter(e => e.status === 'Inside').length;
-
-  document.getElementById('stat-inside').textContent = inside;
-  document.getElementById('stat-equip').textContent = equipInside;
-  document.getElementById('stat-overstay').textContent = overstay;
-  document.getElementById('stat-today').textContent = todayV;
-
-  // per type stats
-  const activeV = visitors.filter(v => v.status === 'Inside' || v.status === 'Overstay');
-  document.getElementById('stat-guest').textContent = activeV.filter(v => v.visitorType === 'Guest').length;
-  document.getElementById('stat-contractor').textContent = activeV.filter(v => v.visitorType === 'Contractor').length;
-  document.getElementById('stat-driver').textContent = activeV.filter(v => v.visitorType === 'Driver').length;
-  document.getElementById('stat-employee').textContent = activeV.filter(v => v.visitorType === 'Employee Test').length;
-  document.getElementById('stat-auditor').textContent = activeV.filter(v => v.visitorType === 'Auditor').length;
-
-  // update sidebar badge
-  document.getElementById('badge-visitors').textContent = inside;
-  document.getElementById('badge-visitors').style.display = inside > 0 ? '' : 'none';
-
-  // chart — 7 days
-  const days = [];
-  for (let i=6; i>=0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i);
-    const dateStr = d.toDateString();
-    const count = visitors.filter(v => new Date(v.checkIn).toDateString() === dateStr).length;
-    days.push({ label: ['Min','Sen','Sel','Rab','Kam','Jum','Sab'][d.getDay()], count });
-  }
-  const maxCount = Math.max(...days.map(d => d.count), 1);
-  const chartEl = document.getElementById('dash-chart-visitors');
-  chartEl.innerHTML = days.map(d => `
-    <div class="bar-wrap">
-      <div class="bar-val">${d.count}</div>
-      <div class="bar" style="height:${Math.max((d.count/maxCount)*90, 4)}px"></div>
-      <div class="bar-label">${d.label}</div>
-    </div>
-  `).join('');
-
-  // alerts
-  const alerts = DB.alerts().filter(a => !a.resolved).slice(0,4);
-  const alertsEl = document.getElementById('dash-alerts');
-  if (alerts.length === 0) {
-    alertsEl.innerHTML = '<div class="empty"><i class="ti ti-check"></i><p>Tidak ada alert aktif</p></div>';
-  } else {
-    alertsEl.innerHTML = alerts.map(a => `
-      <div class="alert-row">
-        <div class="alert-icon ${a.severity.toLowerCase()}"><i class="ti ti-alert-circle"></i></div>
-        <div class="alert-body">
-          <div class="alert-title">${a.message}</div>
-          <div class="alert-meta">${a.detail} · <span class="pill pill-${a.severity.toLowerCase()}">${a.severity}</span></div>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  // active visitors table
-  const active = visitors.filter(v => v.status === 'Inside' || v.status === 'Overstay' || v.status === 'Waiting Approval');
-  const tbody = document.getElementById('dash-visitor-table');
-  if (active.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8"><div class="empty"><i class="ti ti-users"></i><p>Tidak ada visitor aktif</p></div></td></tr>';
-  } else {
-    tbody.innerHTML = active.map(v => `
-      <tr>
-        <td><div class="td-main">${v.name}</div><div class="td-sub">${v.identity || '—'}</div></td>
-        <td>${v.company}</td>
-        <td>${v.host}<div class="td-sub">${v.dept}</div></td>
-        <td>${v.purpose}</td>
-        <td><div class="mono">${fmtTime(v.checkIn)}</div></td>
-        <td><span class="timer ${durationSecs(v.checkIn) > 14400 ? 'danger' : durationSecs(v.checkIn) > 10800 ? 'warn' : ''}" data-checkin="${v.checkIn}" data-status="${v.status}">${v.status === 'Checked Out' ? fmtDuration(v.checkIn, v.checkOut) : fmtDuration(v.checkIn)}</span></td>
-        <td>${statusPill(v.status)}</td>
-        <td>
-          <div class="flex-gap8">
-            <button class="btn btn-sm" onclick="openDetail('${v.id}')"><i class="ti ti-eye"></i></button>
-            ${v.status !== 'Checked Out' ? `<button class="btn btn-sm btn-success" onclick="doCheckout('${v.id}')"><i class="ti ti-logout"></i> Out</button>` : ''}
-          </div>
-        </td>
-      </tr>
-    `).join('');
-  }
-}
-
-function statusPill(status) {
-  const map = { 'Inside': 'inside', 'Waiting Approval': 'waiting', 'Checked Out': 'out', 'Overstay': 'overstay', 'Pending Approval': 'pending' };
-  return `<span class="pill pill-${map[status] || 'out'}">${status}</span>`;
-}
-
-// ══════════════════════════════════════════
-//  VISITOR TABLE
-// ══════════════════════════════════════════
-function typePill(type) {
-  const map = {
-    'Guest': ['pill-pending', 'ti-user'],
-    'Contractor': ['pill-waiting', 'ti-hard-hat'],
-    'Driver': ['pill-good', 'ti-truck'],
-    'Employee Test': ['pill-out', 'ti-id-badge'],
-    'Auditor': ['pill-overstay', 'ti-clipboard-check'],
-  };
-  const [cls, icon] = map[type] || ['pill-out', 'ti-user'];
-  return `<span class="pill ${cls}"><i class="ti ${icon}" style="font-size:10px"></i> ${type || '—'}</span>`;
-}
-
-function switchVisitorType(type, el) {
-  currentVisitorType = type;
-  document.querySelectorAll('#visitor-type-tabs .type-tab').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
-  renderVisitorTable();
-}
-
-function updateTypeCounts() {
-  const visitors = DB.visitors();
-  const types = ['guest','contractor','driver','employee','auditor'];
-  const typeNames = ['Guest','Contractor','Driver','Employee Test','Auditor'];
-  document.getElementById('tc-all').textContent = visitors.length;
-  types.forEach((t,i) => {
-    const el = document.getElementById('tc-'+t);
-    if (el) el.textContent = visitors.filter(v => v.visitorType === typeNames[i]).length;
-  });
-}
-
-function renderVisitorTable() {
-  let visitors = DB.visitors();
-  const q = (document.getElementById('visitor-search')?.value || '').toLowerCase();
-  const statusFilter = document.getElementById('visitor-filter-status')?.value || '';
-  const tabFilter = tabFilters['visitors'] || 'all';
-
-  if (currentVisitorType !== 'all') visitors = visitors.filter(v => v.visitorType === currentVisitorType);
-  if (q) visitors = visitors.filter(v => (v.name||'').toLowerCase().includes(q) || (v.company||'').toLowerCase().includes(q) || (v.host||'').toLowerCase().includes(q));
-  if (statusFilter) visitors = visitors.filter(v => v.status === statusFilter);
-  if (tabFilter === 'inside') visitors = visitors.filter(v => v.status === 'Inside' || v.status === 'Overstay');
-  if (tabFilter === 'today') visitors = visitors.filter(v => isToday(v.checkIn));
-  if (tabFilter === 'out') visitors = visitors.filter(v => v.status === 'Checked Out');
-
-  visitors.sort((a,b) => {
-    const order = { 'Overstay':0,'Inside':1,'Waiting Approval':2,'Checked Out':3 };
-    return (order[a.status] ?? 99) - (order[b.status] ?? 99);
-  });
-
-  updateTypeCounts();
-
-  const tbody = document.getElementById('visitor-table');
-  if (!tbody) return;
-  if (visitors.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9"><div class="empty"><i class="ti ti-users"></i><p>Tidak ada data visitor</p></div></td></tr>';
-    return;
-  }
-  tbody.innerHTML = visitors.map((v, i) => `
-    <tr>
-      <td class="mono">${i+1}</td>
-      <td>
-        <div class="td-main">${v.name}</div>
-        <div class="td-sub mono">${v.id}</div>
-      </td>
-      <td>${typePill(v.visitorType)}</td>
-      <td>${v.company || '—'}<div class="td-sub">${v.phone || ''}</div></td>
-      <td>${v.host}<div class="td-sub">${v.dept || ''}</div></td>
-      <td class="mono">${fmtDateTime(v.checkIn)}</td>
-      <td>
-        ${v.visitorType === 'Contractor'
-          ? getSLADisplay(v.slaStart)
-          : v.status === 'Waiting Approval'
-            ? '<span style="font-size:12px;color:var(--text3)">— Menunggu —</span>'
-            : `<span class="timer ${durationSecs(v.checkIn, v.checkOut) > 14400 && v.status !== 'Checked Out' ? 'danger' : ''}"
-                ${v.status !== 'Checked Out' ? `data-checkin="${v.checkIn}" data-status="${v.status}"` : ''}>
-                ${fmtDuration(v.checkIn, v.checkOut)}</span>`
-        }
-      </td>
-      <td>${statusPill(v.status)}</td>
-      <td>
-        <div class="flex-gap8">
-          <button class="btn btn-sm" onclick="openDetail('${v.id}')"><i class="ti ti-eye"></i></button>
-          ${v.visitorType === 'Driver' && v.status !== 'Checked Out'
-            ? `<button class="btn btn-sm btn-primary" onclick="openDriverApproval('${v.id}')"><i class="ti ti-truck"></i> Approval</button>`
-            : `${v.status === 'Waiting Approval' ? `<button class="btn btn-sm btn-primary" onclick="approveVisitor('${v.id}')"><i class="ti ti-check"></i></button>` : ''}
-               ${v.status !== 'Checked Out' ? `<button class="btn btn-sm btn-success" onclick="doCheckout('${v.id}')"><i class="ti ti-logout"></i></button>` : ''}`
-          }
-          <button class="btn btn-sm btn-danger" onclick="deleteVisitor('${v.id}')"><i class="ti ti-trash"></i></button>
-        </div>
-      </td>
-    </tr>
-  `).join('');
-}
-
-function openCheckinByType() {
-  const typeMap = {
-    'Guest': 'modal-checkin-guest',
-    'Contractor': 'modal-checkin-contractor',
-    'Driver': 'modal-checkin-driver',
-    'Employee Test': 'modal-checkin-employee',
-    'Auditor': 'modal-checkin-auditor',
-  };
-  if (currentVisitorType !== 'all' && typeMap[currentVisitorType]) {
-    openModal(typeMap[currentVisitorType]);
-  } else {
-    openModal('modal-select-type');
-  }
-}
-
-// ── EQUIPMENT ROW (Contractor) ────────────────────────────
-function addEquipmentRow() {
-  const list = document.getElementById('con-equipment-list');
-  const row = document.createElement('div');
-  row.className = 'equip-row';
-  row.innerHTML = `
-    <input type="text" class="eq-nama" placeholder="Nama peralatan">
-    <input type="number" class="eq-qty" placeholder="Qty" min="1"
-      oninput="this.value=this.value.replace(/[^0-9]/g,'')" style="text-align:center">
-    <button type="button" class="btn-remove-equip" onclick="this.closest('.equip-row').remove()">
-      <i class="ti ti-x"></i>
-    </button>
-  `;
-  list.appendChild(row);
-  row.querySelector('.eq-nama').focus();
-}
-
-// ── SLA HELPERS ───────────────────────────────────────────
-function getSLADisplay(slaStart) {
-  if (!slaStart) return '<span class="sla-badge sla-warn"><i class="ti ti-clock"></i> Menunggu Approval</span>';
-  const secs = durationSecs(slaStart);
-  const label = fmtDuration(slaStart);
-  if (secs < 8 * 3600)  return `<span class="sla-badge sla-ok"><i class="ti ti-clock"></i> ${label}</span>`;
-  if (secs < 12 * 3600) return `<span class="sla-badge sla-warn"><i class="ti ti-alert-triangle"></i> ${label}</span>`;
-  return `<span class="sla-badge sla-over"><i class="ti ti-alert-circle"></i> ${label}</span>`;
-}
-
-// ── DRIVER APPROVAL SYSTEM ────────────────────────────────
-function openDriverApproval(id) {
-  const v = DB.visitors().find(x => x.id === id);
-  if (!v) return;
-
-  const gatePassExists = !!v.gatePassOut;
-  const isApproved     = v.driverApproved;
-
-  const content = document.getElementById('driver-approval-content');
-  content.innerHTML = `
-    <div style="margin-bottom:16px">
-      <div style="font-weight:600;font-size:15px">${v.name}</div>
-      <div style="font-size:12px;color:var(--text3)">${v.company || '—'} · ${v.plate || '—'} · ${v.vehicle || '—'}</div>
-      <div style="margin-top:6px;font-size:12px;color:var(--text3)">Muatan: ${v.cargo || '—'}</div>
-      <div style="margin-top:4px">${statusPill(v.status)}</div>
-    </div>
-
-    <div class="approval-step">
-      <div class="approval-step-icon step-done"><i class="ti ti-login"></i></div>
-      <div>
-        <div style="font-weight:500;font-size:13px">Check In</div>
-        <div style="font-size:12px;color:var(--text3)">Masuk: ${fmtDateTime(v.checkIn)}</div>
-      </div>
-    </div>
-
-    <div class="approval-step">
-      <div class="approval-step-icon ${isApproved ? 'step-done' : 'step-pend'}">
-        <i class="ti ${isApproved ? 'ti-check' : 'ti-clock'}"></i>
-      </div>
-      <div>
-        <div style="font-weight:500;font-size:13px">Approval Keluar</div>
-        <div style="font-size:12px;color:var(--text3)">
-          ${isApproved ? `Disetujui: ${fmtDateTime(v.approvedAt)}` : 'Menunggu persetujuan security/admin'}
-        </div>
-      </div>
-    </div>
-
-    <div class="approval-step">
-      <div class="approval-step-icon ${gatePassExists ? 'step-done' : 'step-lock'}">
-        <i class="ti ${gatePassExists ? 'ti-file-check' : 'ti-lock'}"></i>
-      </div>
-      <div>
-        <div style="font-weight:500;font-size:13px">Gate Pass Keluar</div>
-        <div style="font-size:12px;color:var(--text3)">
-          ${gatePassExists ? `No: <strong>${v.gatePassOut}</strong>` : 'Terkunci — butuh approval terlebih dahulu'}
-        </div>
-      </div>
-    </div>
-
-    <div class="approval-step">
-      <div class="approval-step-icon ${v.status === 'Checked Out' ? 'step-done' : 'step-lock'}">
-        <i class="ti ${v.status === 'Checked Out' ? 'ti-logout' : 'ti-lock'}"></i>
-      </div>
-      <div>
-        <div style="font-weight:500;font-size:13px">Check Out</div>
-        <div style="font-size:12px;color:var(--text3)">
-          ${v.status === 'Checked Out' ? fmtDateTime(v.checkOut) : 'Terkunci — selesaikan step di atas'}
-        </div>
-      </div>
-    </div>
-  `;
-
-  const actions = document.getElementById('driver-approval-actions');
-  actions.innerHTML = `<button class="btn" onclick="closeModal('modal-driver-approval')">Tutup</button>`;
-
-  if (!isApproved && v.status !== 'Checked Out') {
-    actions.innerHTML += `
-      <button class="btn btn-primary" onclick="approveDriverOut('${v.id}')">
-        <i class="ti ti-check"></i> Approve Keluar
-      </button>`;
-  }
-  if (isApproved && !gatePassExists && v.status !== 'Checked Out') {
-    actions.innerHTML += `
-      <button class="btn btn-success" onclick="generateDriverGatePass('${v.id}')">
-        <i class="ti ti-file-plus"></i> Generate Gate Pass
-      </button>`;
-  }
-  if (gatePassExists && v.status !== 'Checked Out') {
-    actions.innerHTML += `
-      <button class="btn btn-success" onclick="doCheckout('${v.id}'); closeModal('modal-driver-approval')">
-        <i class="ti ti-logout"></i> Check Out
-      </button>`;
-  }
-
-  openModal('modal-driver-approval');
-}
-
-function approveDriverOut(id) {
-  const visitors = DB.visitors();
-  const v = visitors.find(x => x.id === id);
-  if (!v) return;
-  v.driverApproved = true;
-  v.approvedAt = now();
-  DB.setVisitors(visitors);
-  addAudit('APPROVE_OUT', 'DRIVER', v.name + ' — disetujui keluar');
-  sendLogToGAS('APPROVE_OUT', 'DRIVER', v.name + ' — disetujui keluar');
-  toast(v.name + ' disetujui keluar — silakan generate Gate Pass', 'success');
-  openDriverApproval(id); // refresh modal
-}
-
-function generateDriverGatePass(id) {
-  const visitors = DB.visitors();
-  const v = visitors.find(x => x.id === id);
-  if (!v) return;
-  if (!v.driverApproved) { toast('Driver belum mendapat approval keluar', 'error'); return; }
-
-  // Generate gate pass number
-  const d = new Date();
-  const ds = d.getFullYear().toString() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
-  const existing = DB.visitors().filter(x => x.gatePassOut && x.gatePassOut.startsWith('GPD-'+ds));
-  const num = String(existing.length + 1).padStart(3,'0');
-  v.gatePassOut = 'GPD-' + ds + '-' + num;
-
-  DB.setVisitors(visitors);
-  addAudit('GATE_PASS', 'DRIVER', v.name + ' — ' + v.gatePassOut);
-  sendLogToGAS('GATE_PASS', 'DRIVER', v.name + ' — ' + v.gatePassOut);
-  toast('Gate Pass ' + v.gatePassOut + ' berhasil dibuat', 'success');
-  openDriverApproval(id); // refresh modal
-}
-
-// ══════════════════════════════════════════
-//  EQUIPMENT TABLE
-// ══════════════════════════════════════════
-function renderEquipmentTable() {
-  let items = DB.equipment();
-  const q = (document.getElementById('equip-search')?.value || '').toLowerCase();
-  const tabFilter = tabFilters['equipment'] || 'all';
-
-  if (q) items = items.filter(e => e.name.toLowerCase().includes(q) || e.serial.toLowerCase().includes(q) || e.owner.toLowerCase().includes(q));
-  if (tabFilter === 'inside') items = items.filter(e => e.status === 'Inside');
-  if (tabFilter === 'outside') items = items.filter(e => e.status === 'Outside');
-  if (tabFilter === 'pending') items = items.filter(e => e.status === 'Pending Approval');
-
-  const tbody = document.getElementById('equipment-table');
-  if (!tbody) return;
-  if (items.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9"><div class="empty"><i class="ti ti-package"></i><p>Tidak ada data equipment</p></div></td></tr>';
-    return;
-  }
-  tbody.innerHTML = items.map((e, i) => `
-    <tr>
-      <td class="mono">${i+1}</td>
-      <td><div class="td-main">${e.name}</div><div class="td-sub">${e.notes || ''}</div></td>
-      <td class="mono">${e.serial || '—'}</td>
-      <td>${e.owner}</td>
-      <td class="mono">${e.gatePass}</td>
-      <td><span class="pill ${e.condition === 'Good / Baik' ? 'pill-good' : 'pill-waiting'}">${e.condition}</span></td>
-      <td>${statusPill(e.status)}</td>
-      <td class="mono">${fmtDate(e.dateIn)}</td>
-      <td>
-        <div class="flex-gap8">
-          ${e.status === 'Inside' ? `<button class="btn btn-sm btn-success" onclick="equipCheckout('${e.id}')"><i class="ti ti-logout"></i> Out</button>` : ''}
-          ${e.status === 'Pending Approval' ? `<button class="btn btn-sm btn-primary" onclick="approveEquip('${e.id}')"><i class="ti ti-check"></i></button>` : ''}
-          <button class="btn btn-sm btn-danger" onclick="deleteEquip('${e.id}')"><i class="ti ti-trash"></i></button>
-        </div>
-      </td>
-    </tr>
-  `).join('');
-}
-
-// ══════════════════════════════════════════
-//  REALTIME
-// ══════════════════════════════════════════
-function renderRealtime() {
-  const visitors = DB.visitors().filter(v => v.status === 'Inside' || v.status === 'Overstay');
-  const equipment = DB.equipment().filter(e => e.status === 'Inside');
-
-  document.getElementById('rt-inside').textContent = visitors.length;
-  document.getElementById('rt-equip').textContent = equipment.length;
-  document.getElementById('rt-overstay').textContent = visitors.filter(v => v.status === 'Overstay').length;
-
-  // longest
-  let longest = null;
-  visitors.forEach(v => {
-    if (!longest || durationSecs(v.checkIn) > durationSecs(longest.checkIn)) longest = v;
-  });
-  document.getElementById('rt-longest').textContent = longest ? fmtDuration(longest.checkIn) : '00:00:00';
-  document.getElementById('rt-longest-name').textContent = longest ? longest.name : '—';
-
-  const tbody = document.getElementById('rt-table');
-  if (!tbody) return;
-  if (visitors.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><i class="ti ti-users"></i><p>Tidak ada visitor di dalam pabrik</p></div></td></tr>';
-    return;
-  }
-  tbody.innerHTML = visitors.map(v => `
-    <tr>
-      <td><div class="td-main">${v.name}</div><div class="td-sub">${v.identity || ''}</div></td>
-      <td>${v.company}</td>
-      <td>${v.host}<div class="td-sub">${v.dept}</div></td>
-      <td class="mono">${fmtTime(v.checkIn)}</td>
-      <td><span class="timer ${durationSecs(v.checkIn) > 14400 ? 'danger' : durationSecs(v.checkIn) > 10800 ? 'warn' : ''}" data-checkin="${v.checkIn}" data-status="${v.status}">${fmtDuration(v.checkIn)}</span></td>
-      <td>${statusPill(v.status)}</td>
-      <td><button class="btn btn-sm btn-success" onclick="doCheckout('${v.id}')"><i class="ti ti-logout"></i> Check Out</button></td>
-    </tr>
-  `).join('');
-}
-
-// ══════════════════════════════════════════
-//  ALERTS
-// ══════════════════════════════════════════
-function renderAlerts() {
-  const alerts = DB.alerts();
-  const el = document.getElementById('alerts-list');
-  if (!el) return;
-  if (alerts.length === 0) {
-    el.innerHTML = '<div class="empty"><i class="ti ti-bell-off"></i><p>Tidak ada alert</p></div>';
-    return;
-  }
-  el.innerHTML = alerts.map(a => `
-    <div class="alert-row" style="${a.resolved ? 'opacity:.5' : ''}">
-      <div class="alert-icon ${a.severity.toLowerCase()}"><i class="ti ti-alert-circle"></i></div>
-      <div class="alert-body" style="flex:1">
-        <div class="alert-title">${a.message} ${a.resolved ? '<span class="pill pill-out">Resolved</span>' : ''}</div>
-        <div class="alert-meta">${a.detail}</div>
-        <div class="alert-meta mono">${fmtDateTime(a.ts)}</div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
-        <span class="pill pill-${a.severity.toLowerCase()}">${a.severity}</span>
-        ${!a.resolved ? `<button class="btn btn-sm" onclick="resolveAlert('${a.id}')"><i class="ti ti-check"></i> Resolve</button>` : ''}
-      </div>
-    </div>
-  `).join('');
-}
-
-function resolveAlert(id) {
-  const alerts = DB.alerts();
-  const a = alerts.find(x => x.id === id);
-  if (!a) return;
-  a.resolved = true;
-  DB.setAlerts(alerts);
-  renderAlerts();
-  checkAlerts();
-  toast('Alert resolved', 'success');
-  addAudit('RESOLVE_ALERT', 'ALERT', a.message);
-  sendLogToGAS('RESOLVE_ALERT', 'ALERT', a.message);
-}
-
-// ══════════════════════════════════════════
-//  EMERGENCY
-// ══════════════════════════════════════════
-function renderEmergency() {
-  const visitors = DB.visitors().filter(v => v.status === 'Inside' || v.status === 'Overstay' || v.status === 'Waiting Approval');
-  document.getElementById('emergency-count').textContent = visitors.length + ' visitor di dalam';
-  const tbody = document.getElementById('emergency-table');
-  if (!tbody) return;
-  if (visitors.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><i class="ti ti-check"></i><p>Pabrik kosong — semua visitor sudah keluar</p></div></td></tr>';
-    return;
-  }
-  tbody.innerHTML = visitors.map((v,i) => `
-    <tr>
-      <td>${i+1}</td>
-      <td><div class="td-main">${v.name}</div><div class="td-sub">${v.company}</div></td>
-      <td>${v.company}</td>
-      <td>${v.host}<div class="td-sub">${v.dept}</div></td>
-      <td class="mono">${fmtDateTime(v.checkIn)}</td>
-      <td><span class="timer ${durationSecs(v.checkIn) > 14400 ? 'danger' : ''}" data-checkin="${v.checkIn}" data-status="${v.status}">${fmtDuration(v.checkIn)}</span></td>
-      <td>${statusPill(v.status)}</td>
-    </tr>
-  `).join('');
-}
-
-function exportEmergency() {
-  const visitors = DB.visitors().filter(v => v.status === 'Inside' || v.status === 'Overstay' || v.status === 'Waiting Approval');
-  let csv = 'No,Nama,Perusahaan,Host,Dept,Check-in,Durasi,Status\n';
-  visitors.forEach((v,i) => {
-    csv += `${i+1},"${v.name}","${v.company}","${v.host}","${v.dept}","${fmtDateTime(v.checkIn)}","${fmtDuration(v.checkIn)}","${v.status}"\n`;
-  });
-  downloadCSV(csv, 'emergency-muster-' + new Date().toISOString().slice(0,10) + '.csv');
-  addAudit('EXPORT', 'EMERGENCY', 'Emergency muster report exported');
-  sendLogToGAS('EXPORT', 'EMERGENCY', 'Emergency muster report exported — ' + visitors.length + ' visitor');
-  toast('Emergency muster report downloaded', 'success');
-}
-
-// ══════════════════════════════════════════
-//  QR SYSTEM
-// ══════════════════════════════════════════
-function renderQR() {
-  const visitors = DB.visitors();
-  const sel = document.getElementById('qr-visitor-select');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">— Pilih visitor —</option>' + visitors.map(v => `<option value="${v.id}">${v.name} (${v.company})</option>`).join('');
-}
-
-function showQR() {
-  const id = document.getElementById('qr-visitor-select').value;
-  if (!id) { document.getElementById('qr-visitor-name').textContent = '—'; document.getElementById('qr-visitor-id').textContent = '—'; return; }
-  const v = DB.visitors().find(x => x.id === id);
-  if (!v) return;
-  document.getElementById('qr-visitor-name').textContent = v.name;
-  document.getElementById('qr-visitor-id').textContent = v.id;
-  // generate QR using simple API
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(v.id)}`;
-  document.getElementById('qr-img-wrap').innerHTML = `<img src="${qrUrl}" alt="QR Code" style="width:150px;height:150px;border-radius:6px">`;
-}
-
-function qrLookup() {
-  const id = document.getElementById('qr-scan-input').value.trim();
-  if (!id) { toast('Masukkan Visitor ID', 'error'); return; }
-  const v = DB.visitors().find(x => x.id === id);
-  const el = document.getElementById('qr-result');
-  if (!v) { el.innerHTML = `<div style="color:var(--red);font-size:13px"><i class="ti ti-x"></i> Visitor ID tidak ditemukan</div>`; return; }
-  el.innerHTML = `
-    <div class="card" style="margin-top:0">
-      <div class="td-main">${v.name}</div>
-      <div class="td-sub">${v.company} · ${v.host}</div>
-      <div class="mt8">${statusPill(v.status)}</div>
-      <div class="td-sub mono mt8">Check-in: ${fmtDateTime(v.checkIn)}</div>
-    </div>
-  `;
-}
-
-function qrCheckin() {
-  const id = document.getElementById('qr-scan-input').value.trim();
-  if (!id) { toast('Masukkan Visitor ID', 'error'); return; }
-  const visitors = DB.visitors();
-  const v = visitors.find(x => x.id === id);
-  if (!v) { toast('Visitor tidak ditemukan', 'error'); return; }
-  if (v.status === 'Inside') { toast('Visitor sudah di dalam', 'info'); return; }
-  v.status = 'Inside'; v.checkIn = now();
-  DB.setVisitors(visitors);
-  addAudit('CHECK_IN', 'VISITOR', v.name + ' — QR scan');
-  toast(v.name + ' berhasil check in via QR', 'success');
-  qrLookup();
-  // Kirim ke Google Sheets
-  sendToGAS('CHECKIN_VISITOR', {
-    ...v,
-    source: 'QR_SCAN',
-    user: document.getElementById('sb-uname').textContent,
-  });
-  sendToGAS('SCAN_QR', { refId: id, action: 'Check In' });
-  sendLogToGAS('CHECK_IN', 'VISITOR', v.name + ' — via QR scan');
-}
-
-function qrCheckout() {
-  const id = document.getElementById('qr-scan-input').value.trim();
-  if (!id) { toast('Masukkan Visitor ID', 'error'); return; }
-  const visitors = DB.visitors();
-  const v = visitors.find(x => x.id === id);
-  if (!v) { toast('Visitor tidak ditemukan', 'error'); return; }
-  if (v.status === 'Checked Out') { toast('Visitor sudah check out', 'info'); return; }
-  v.status = 'Checked Out'; v.checkOut = now();
-  DB.setVisitors(visitors);
-  addAudit('CHECK_OUT', 'VISITOR', v.name + ' — QR scan');
-  toast(v.name + ' berhasil check out via QR', 'success');
-  qrLookup();
-  // Kirim ke Google Sheets
-  sendToGAS('CHECKOUT_VISITOR', {
-    id: id,
-    checkOutTime: v.checkOut,
-    durasi: fmtDuration(v.checkIn, v.checkOut),
-    source: 'QR_SCAN',
-    user: document.getElementById('sb-uname').textContent,
-  });
-  sendToGAS('SCAN_QR', { refId: id, action: 'Check Out' });
-  sendLogToGAS('CHECK_OUT', 'VISITOR', v.name + ' — via QR scan');
-}
-
-function printQR() { window.print(); }
-function downloadQR() {
-  const id = document.getElementById('qr-visitor-select').value;
-  if (!id) { toast('Pilih visitor terlebih dahulu', 'error'); return; }
-  const v = DB.visitors().find(x => x.id === id);
-  if (!v) return;
-  const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(v.id)}`;
-  const a = document.createElement('a'); a.href = url; a.download = 'QR-' + v.id + '.png';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  toast('QR Code downloaded', 'success');
-}
-
-// ══════════════════════════════════════════
-//  REPORTS
-// ══════════════════════════════════════════
-function initReports() {
-  const dateEl = document.getElementById('report-date');
-  if (dateEl && !dateEl.value) dateEl.value = new Date().toISOString().slice(0,10);
-  const monthEl = document.getElementById('report-month');
-  if (monthEl && monthEl.children.length === 0) {
-    for (let i=0; i<6; i++) {
-      const d = new Date(); d.setMonth(d.getMonth() - i);
-      const val = d.toISOString().slice(0,7);
-      const opt = document.createElement('option'); opt.value = val;
-      opt.textContent = d.toLocaleDateString('id-ID', {month:'long', year:'numeric'});
-      monthEl.appendChild(opt);
-    }
-  }
-}
-
-function renderReportDaily() {
-  const dateEl = document.getElementById('report-date');
-  if (!dateEl) return;
-  const d = new Date(dateEl.value);
-  const visitors = DB.visitors().filter(v => new Date(v.checkIn).toDateString() === d.toDateString());
-  const tbody = document.getElementById('report-daily-table');
-  if (!tbody) return;
-  if (visitors.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9"><div class="empty"><i class="ti ti-calendar"></i><p>Tidak ada data untuk tanggal ini</p></div></td></tr>';
-    return;
-  }
-  tbody.innerHTML = visitors.map((v,i) => `
-    <tr>
-      <td>${i+1}</td>
-      <td>${v.name}</td>
-      <td>${v.company}</td>
-      <td>${v.host}</td>
-      <td>${v.purpose}</td>
-      <td class="mono">${fmtTime(v.checkIn)}</td>
-      <td class="mono">${v.checkOut ? fmtTime(v.checkOut) : '—'}</td>
-      <td class="mono">${fmtDuration(v.checkIn, v.checkOut)}</td>
-      <td>${statusPill(v.status)}</td>
-    </tr>
-  `).join('');
-}
-
-function renderReportWeekly() {
-  const days = [];
-  for (let i=6; i>=0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i);
-    const ds = d.toDateString();
-    const all = DB.visitors().filter(v => new Date(v.checkIn).toDateString() === ds);
-    days.push({ label: d.toLocaleDateString('id-ID', {weekday:'long', day:'2-digit', month:'short'}), total: all.length, out: all.filter(v=>v.status==='Checked Out').length, inside: all.filter(v=>v.status==='Inside'||v.status==='Overstay').length });
-  }
-  const max = Math.max(...days.map(d=>d.total), 1);
-  const chart = document.getElementById('weekly-chart');
-  if (chart) chart.innerHTML = days.map(d => `<div class="bar-wrap"><div class="bar-val">${d.total}</div><div class="bar" style="height:${Math.max((d.total/max)*90,4)}px"></div><div class="bar-label">${d.label.split(',')[0]}</div></div>`).join('');
-  const tbody = document.getElementById('weekly-table');
-  if (!tbody) return;
-  tbody.innerHTML = days.map(d => `<tr><td>${d.label}</td><td>${d.total}</td><td>${d.out}</td><td>${d.inside}</td></tr>`).join('');
-}
-
-function renderReportMonthly() {
-  const monthEl = document.getElementById('report-month');
-  if (!monthEl || !monthEl.value) return;
-  const [year, month] = monthEl.value.split('-').map(Number);
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const rows = [];
-  for (let i=1; i<=daysInMonth; i++) {
-    const d = new Date(year, month-1, i).toDateString();
-    const all = DB.visitors().filter(v => new Date(v.checkIn).toDateString() === d);
-    if (all.length > 0) rows.push({ date: `${String(i).padStart(2,'0')}/${String(month).padStart(2,'0')}/${year}`, total: all.length, out: all.filter(v=>v.status==='Checked Out').length, inside: all.filter(v=>v.status==='Inside'||v.status==='Overstay').length, overstay: all.filter(v=>v.status==='Overstay').length });
-  }
-  const tbody = document.getElementById('monthly-table');
-  if (!tbody) return;
-  if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty"><p>Tidak ada data untuk bulan ini</p></div></td></tr>'; return; }
-  tbody.innerHTML = rows.map(r => `<tr><td class="mono">${r.date}</td><td>${r.total}</td><td>${r.out}</td><td>${r.inside}</td><td>${r.overstay > 0 ? `<span class="pill pill-overstay">${r.overstay}</span>` : '0'}</td></tr>`).join('');
-}
-
-function renderFreqVisitors() {
-  const visitors = DB.visitors();
-  const freq = {};
-  visitors.forEach(v => {
-    const key = v.name + '___' + v.company;
-    if (!freq[key]) freq[key] = { name: v.name, company: v.company, count: 0, last: null };
-    freq[key].count++;
-    if (!freq[key].last || new Date(v.checkIn) > new Date(freq[key].last)) freq[key].last = v.checkIn;
-  });
-  const sorted = Object.values(freq).sort((a,b) => b.count - a.count).slice(0,10);
-  const tbody = document.getElementById('freq-table');
-  if (!tbody) return;
-  if (sorted.length === 0) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty"><p>Belum ada data</p></div></td></tr>'; return; }
-  tbody.innerHTML = sorted.map((r,i) => `<tr><td>${i+1}</td><td>${r.name}</td><td>${r.company}</td><td><strong>${r.count}</strong> kunjungan</td><td class="mono">${fmtDate(r.last)}</td></tr>`).join('');
-}
-
-function exportReport(type) {
-  const dateEl = document.getElementById('report-date');
-  const d = new Date(dateEl?.value || new Date());
-  const visitors = DB.visitors().filter(v => new Date(v.checkIn).toDateString() === d.toDateString());
-  let csv = 'No,Nama,Perusahaan,Host,Tujuan,Check-in,Check-out,Durasi,Status\n';
-  visitors.forEach((v,i) => {
-    csv += `${i+1},"${v.name}","${v.company}","${v.host}","${v.purpose}","${fmtDateTime(v.checkIn)}","${v.checkOut ? fmtDateTime(v.checkOut) : ''}","${fmtDuration(v.checkIn, v.checkOut)}","${v.status}"\n`;
-  });
-  downloadCSV(csv, 'visitor-report-' + d.toISOString().slice(0,10) + '.csv');
-  addAudit('EXPORT', 'REPORT', 'Daily report ' + d.toISOString().slice(0,10));
-  toast('Report exported', 'success');
-}
-
-// ══════════════════════════════════════════
-//  AUDIT TRAIL
-// ══════════════════════════════════════════
-function renderAudit() {
-  let logs = DB.audit();
-  const q = (document.getElementById('audit-search')?.value || '').toLowerCase();
-  const filter = document.getElementById('audit-filter')?.value || '';
-  if (q) logs = logs.filter(l => l.detail.toLowerCase().includes(q) || l.user.toLowerCase().includes(q) || l.action.toLowerCase().includes(q));
-  if (filter) logs = logs.filter(l => l.action === filter);
-  document.getElementById('audit-count').textContent = logs.length + ' records';
-  const el = document.getElementById('audit-list');
-  if (!el) return;
-  if (logs.length === 0) { el.innerHTML = '<div class="empty"><i class="ti ti-history"></i><p>Tidak ada data audit</p></div>'; return; }
-  el.innerHTML = logs.map(l => `
-    <div class="audit-row">
-      <div class="audit-time">${fmtDateTime(l.ts)}</div>
-      <div class="audit-action">${l.action}</div>
-      <div class="audit-user">${l.user}</div>
-      <div class="audit-detail">${l.entity} — ${l.detail}</div>
-    </div>
-  `).join('');
-}
-
-function clearAudit() {
-  if (!confirm('Hapus semua audit log? Tindakan ini tidak bisa dibatalkan.')) return;
-  DB.setAudit([]);
-  renderAudit();
-  toast('Audit log cleared', 'info');
-  sendLogToGAS('CLEAR_AUDIT', 'AUDIT', 'Semua audit log dihapus');
-}
-
-// ══════════════════════════════════════════
-//  ACTIONS
-// ══════════════════════════════════════════
-function submitCheckinTyped(type) {
-  const prefix = { 'Guest':'g', 'Contractor':'con', 'Driver':'drv', 'Employee Test':'emp', 'Auditor':'aud' }[type];
-  const modalId = { 'Guest':'modal-checkin-guest', 'Contractor':'modal-checkin-contractor', 'Driver':'modal-checkin-driver', 'Employee Test':'modal-checkin-employee', 'Auditor':'modal-checkin-auditor' }[type];
-
-  const get = (id) => document.getElementById(prefix+'-'+id)?.value?.trim() || '';
-
-  const name = get('name');
-  const host = get('host');
-  const purpose = get('purpose');
-
-  if (!name || !host || !purpose) { toast('Lengkapi field yang wajib diisi (*)', 'error'); return; }
-  if (type === 'Contractor') {
-    const area = document.getElementById('con-area')?.value;
-    const personil = document.getElementById('con-personil')?.value;
-    if (!area) { toast('Pilih Area Kerja', 'error'); return; }
-    if (!personil || parseInt(personil) < 1) { toast('Isi Jumlah Personil (angka)', 'error'); return; }
-  }
-
-  const base = {
-    id: genId('VIS'),
-    visitorType: type,
-    name,
-    host,
-    purpose,
-    status: get('status') || 'Inside',
-    checkIn: now(), checkOut: null, createdAt: now(),
-    user: document.getElementById('sb-uname').textContent,
-  };
-
-  // field per tipe
-  if (type === 'Guest') {
-    Object.assign(base, { company: get('company'), phone: get('phone'), identity: get('identity'), dept: document.getElementById('g-dept').value, notes: get('notes') });
-  } else if (type === 'Contractor') {
-    const equipRows = [];
-    document.querySelectorAll('#con-equipment-list .equip-row').forEach(row => {
-      const nama = row.querySelector('.eq-nama')?.value?.trim();
-      const qty  = row.querySelector('.eq-qty')?.value?.trim();
-      if (nama) equipRows.push({ nama, qty: qty || '1' });
-    });
-    const conStatus = document.getElementById('con-status').value;
-    Object.assign(base, {
-      company:    get('company'),
-      phone:      get('phone'),
-      identity:   get('identity'),
-      dept:       document.getElementById('con-dept').value,
-      notes:      get('notes'),
-      spk:        get('spk'),
-      startDate:  get('start'),
-      endDate:    get('end'),
-      area:       document.getElementById('con-area').value,
-      personil:   get('personil'),
-      equipList:  equipRows,
-      slaStart:   conStatus === 'Inside' ? base.checkIn : null,
-    });
-    base.status = conStatus;
-    if (!base.area) { toast('Pilih Area Kerja', 'error'); return; }
-    if (!base.personil || parseInt(base.personil) < 1) { toast('Isi Jumlah Personil', 'error'); return; }
-  } else if (type === 'Driver') {
-    Object.assign(base, { company: get('company'), phone: get('phone'), identity: get('identity'), plate: get('plate'), vehicle: document.getElementById('drv-vehicle').value, cargo: get('cargo'), notes: get('notes') });
-  } else if (type === 'Employee Test') {
-    Object.assign(base, { company: '—', nik: get('nik'), dept: document.getElementById('emp-dept').value, jabatan: get('jabatan'), notes: get('notes') });
-  } else if (type === 'Auditor') {
-    Object.assign(base, { company: get('company'), phone: get('phone'), identity: get('identity'), auditType: document.getElementById('aud-audittype').value, scope: get('scope'), dept: document.getElementById('aud-dept').value, suratTugas: get('surat'), notes: get('notes') });
-  }
-
-  const visitors = DB.visitors();
-  visitors.unshift(base);
-  DB.setVisitors(visitors);
-  addAudit('CHECK_IN', 'VISITOR', `[${type}] ${name} — ${purpose}`);
-  closeModal(modalId);
-  toast(`${name} (${type}) berhasil check in!`, 'success');
-
-  // reset field
-  document.querySelectorAll(`#${modalId} input, #${modalId} textarea`).forEach(el => el.value = '');
-  document.querySelectorAll(`#${modalId} select`).forEach(el => el.selectedIndex = 0);
-
-  checkAlerts();
-  renderPage(currentPage);
-  sendToGAS('CHECKIN_VISITOR', base);
-  sendLogToGAS('CHECK_IN', 'VISITOR', `[${type}] ${name} — ${purpose}`);
-}
-
-
-async function doCheckout(id) {
-  if (!confirm('Konfirmasi check out visitor ini?')) return;
-  const visitors = DB.visitors();
-  const v = visitors.find(x => x.id === id);
-  if (!v) return;
-  v.status = 'Checked Out';
-  v.checkOut = now();
-  DB.setVisitors(visitors);
-  addAudit('CHECK_OUT', 'VISITOR', `${v.name} — durasi: ${fmtDuration(v.checkIn, v.checkOut)}`);
-  toast(v.name + ' berhasil check out', 'success');
-  checkAlerts();
-  renderPage(currentPage);
- 
-  // Kirim ke Google Sheets
-  sendToGAS('CHECKOUT_VISITOR', {
-    id: id,
-    checkOutTime: v.checkOut,
-    durasi: fmtDuration(v.checkIn, v.checkOut),
-    user: document.getElementById('sb-uname').textContent,
-  });
-  sendLogToGAS('CHECK_OUT', 'VISITOR', `${v.name} — ${fmtDuration(v.checkIn, v.checkOut)}`);
-}
-
-
-function approveVisitor(id) {
-  const visitors = DB.visitors();
-  const v = visitors.find(x => x.id === id);
-  if (!v) return;
-  v.status = 'Inside';
-  // SLA Contractor mulai saat approval
-  if (v.visitorType === 'Contractor' && !v.slaStart) {
-    v.slaStart = now();
-  }
-  DB.setVisitors(visitors);
-  addAudit('UPDATE', 'VISITOR', v.name + ' — status diubah ke Inside');
-  toast(v.name + ' disetujui masuk', 'success');
-  renderPage(currentPage);
-  // Kirim ke Google Sheets
-  sendToGAS('UPDATE_STATUS', {
-    sheet: 'Visitors',
-    id: id,
-    status: 'Inside',
-    user: document.getElementById('sb-uname').textContent,
-  });
-  sendLogToGAS('APPROVE', 'VISITOR', v.name + ' — disetujui masuk');
-}
-
-function deleteVisitor(id) {
-  if (!confirm('Hapus data visitor ini?')) return;
-  const visitors = DB.visitors();
-  const v = visitors.find(x => x.id === id);
-  DB.setVisitors(visitors.filter(x => x.id !== id));
-  addAudit('DELETE', 'VISITOR', (v?.name || id) + ' — data dihapus');
-  toast('Data visitor dihapus', 'info');
-  renderPage(currentPage);
-  // Kirim ke Google Sheets
-  sendToGAS('ADD_LOG', {
-    action: 'DELETE', entity: 'VISITOR',
-    refId: id,
-    detail: (v?.name || id) + ' — data dihapus',
-    user: document.getElementById('sb-uname').textContent,
-    ts: now(),
-  });
-}
-
-async function submitEquipment() {
-  const name = document.getElementById('eq-name').value.trim();
-  const owner = document.getElementById('eq-owner').value.trim();
-  if (!name || !owner) { toast('Lengkapi field wajib', 'error'); return; }
- 
-  const eq = {
-    id: genId('EQ'),
-    name, owner,
-    serial: document.getElementById('eq-serial').value.trim(),
-    gatePass: document.getElementById('eq-gatepass').value.trim() || genGatePass(),
-    condition: document.getElementById('eq-condition').value,
-    status: document.getElementById('eq-status').value,
-    notes: document.getElementById('eq-notes').value.trim(),
-    dateIn: now(), dateOut: null,
-    user: document.getElementById('sb-uname').textContent,
-  };
- 
-  const equipment = DB.equipment();
-  equipment.unshift(eq);
-  DB.setEquipment(equipment);
-  addAudit('CREATE', 'EQUIPMENT', `${name} — ${owner} — ${eq.gatePass}`);
-  closeModal('modal-equipment');
-  toast(name + ' berhasil ditambahkan', 'success');
-  ['eq-name','eq-serial','eq-owner','eq-gatepass','eq-notes'].forEach(id => document.getElementById(id).value = '');
-  renderPage(currentPage);
- 
-  // Kirim ke Google Sheets
-  sendToGAS('ADD_EQUIPMENT', eq);
-  sendLogToGAS('CREATE', 'EQUIPMENT', `${name} — ${owner} — ${eq.gatePass}`);
-}
-
-
-async function equipCheckout(id) {
-  if (!confirm('Konfirmasi equipment keluar?')) return;
-  const equipment = DB.equipment();
-  const eq = equipment.find(x => x.id === id);
-  if (!eq) return;
-  eq.status = 'Outside'; eq.dateOut = now();
-  DB.setEquipment(equipment);
-  addAudit('CHECK_OUT', 'EQUIPMENT', eq.name + ' — ' + eq.gatePass);
-  toast(eq.name + ' berhasil check out', 'success');
-  renderPage(currentPage);
- 
-  // Kirim ke Google Sheets
-  sendToGAS('EQUIPMENT_OUT', {
-    id: id,
-    dateOut: eq.dateOut,
-    user: document.getElementById('sb-uname').textContent,
-  });
-  sendLogToGAS('EQUIPMENT_OUT', 'EQUIPMENT', `${eq.name} — ${eq.gatePass}`);
-}
-
-
-function approveEquip(id) {
-  const equipment = DB.equipment();
-  const eq = equipment.find(x => x.id === id);
-  if (!eq) return;
-  eq.status = 'Inside';
-  DB.setEquipment(equipment);
-  addAudit('UPDATE', 'EQUIPMENT', eq.name + ' — disetujui masuk');
-  toast(eq.name + ' disetujui', 'success');
-  renderPage(currentPage);
-  // Kirim ke Google Sheets
-  sendToGAS('UPDATE_STATUS', {
-    sheet: 'Equipment',
-    id: id,
-    status: 'Inside',
-    user: document.getElementById('sb-uname').textContent,
-  });
-  sendLogToGAS('APPROVE', 'EQUIPMENT', eq.name + ' — disetujui masuk');
-}
-
-function deleteEquip(id) {
-  if (!confirm('Hapus data equipment ini?')) return;
-  const equipment = DB.equipment();
-  const eq = equipment.find(x => x.id === id);
-  DB.setEquipment(equipment.filter(x => x.id !== id));
-  addAudit('DELETE', 'EQUIPMENT', (eq?.name || id) + ' — dihapus');
-  toast('Equipment dihapus', 'info');
-  renderPage(currentPage);
-  // Kirim ke Google Sheets
-  sendToGAS('ADD_LOG', {
-    action: 'DELETE', entity: 'EQUIPMENT',
-    refId: id,
-    detail: (eq?.name || id) + ' — dihapus',
-    user: document.getElementById('sb-uname').textContent,
-    ts: now(),
-  });
-}
-
-// DETAIL MODAL
-function openDetail(id) {
-  const v = DB.visitors().find(x => x.id === id);
-  if (!v) return;
-  const content = document.getElementById('modal-detail-content');
-  const actions = document.getElementById('modal-detail-actions');
-
-  content.innerHTML = `
-    <div class="form-grid" style="margin-bottom:16px">
-      <div class="form-group">
-        <label>Visitor ID</label>
-        <div class="mono" style="padding:8px 10px;background:var(--bg);border-radius:var(--radius-sm);font-size:12px">${v.id}</div>
-      </div>
-      <div class="form-group">
-        <label>Status</label>
-        <div>${statusPill(v.status)}</div>
-      </div>
-      <div class="form-group">
-        <label>Full Name</label>
-        <div style="font-weight:500">${v.name}</div>
-      </div>
-      <div class="form-group">
-        <label>Company</label>
-        <div>${v.company}</div>
-      </div>
-      <div class="form-group">
-        <label>Phone</label>
-        <div>${v.phone || '—'}</div>
-      </div>
-      <div class="form-group">
-        <label>Identity Number</label>
-        <div class="mono">${v.identity || '—'}</div>
-      </div>
-      <div class="form-group">
-        <label>Purpose of Visit</label>
-        <div>${v.purpose}</div>
-      </div>
-      <div class="form-group">
-        <label>Host / PIC</label>
-        <div>${v.host}<span style="color:var(--text3)"> · ${v.dept}</span></div>
-      </div>
-      <div class="form-group">
-        <label>Check-in Time</label>
-        <div class="mono">${fmtDateTime(v.checkIn)}</div>
-      </div>
-      <div class="form-group">
-        <label>Check-out Time</label>
-        <div class="mono">${v.checkOut ? fmtDateTime(v.checkOut) : '—'}</div>
-      </div>
-      <div class="form-group">
-        <label>Duration</label>
-        <div class="mono">${fmtDuration(v.checkIn, v.checkOut)}</div>
-      </div>
-      <div class="form-group">
-        <label>Notes</label>
-        <div>${v.notes || '—'}</div>
-      </div>
-    </div>
-    <!-- Visitor Badge Preview -->
-    <div style="margin-top:8px">
-      <label style="font-size:12px;font-weight:500;color:var(--text2);display:block;margin-bottom:8px">Visitor Badge Preview</label>
-      <div class="badge-card">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-          <div class="sb-avatar" style="width:44px;height:44px;font-size:16px">${v.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
-          <div>
-            <div class="bc-name">${v.name}</div>
-            <div class="bc-company">${v.company}</div>
-          </div>
-        </div>
-        <div style="background:rgba(255,255,255,.07);border-radius:6px;padding:10px;font-size:12px;color:rgba(255,255,255,.7)">
-          <div>🏢 Host: ${v.host} — ${v.dept}</div>
-          <div style="margin-top:4px">📋 ${v.purpose}</div>
-          <div style="margin-top:4px">🕐 Masuk: ${fmtDateTime(v.checkIn)}</div>
-        </div>
-        <div class="bc-status" style="margin-top:10px">${v.status}</div>
-        <div class="bc-detail mono">ID: ${v.id}</div>
-      </div>
-    </div>
-  `;
-
-  actions.innerHTML = `
-    <button class="btn" onclick="closeModal('modal-detail')">Tutup</button>
-    ${v.status !== 'Checked Out' ? `<button class="btn btn-success" onclick="doCheckout('${v.id}'); closeModal('modal-detail')"><i class="ti ti-logout"></i> Check Out</button>` : ''}
-    <button class="btn btn-primary" onclick="printBadge()"><i class="ti ti-printer"></i> Print Badge</button>
-  `;
-
-  openModal('modal-detail');
-}
-
-function printBadge() { window.print(); }
-
-// ══════════════════════════════════════════
-//  MODAL HELPERS
-// ══════════════════════════════════════════
-function openModal(id) {
-  document.getElementById(id).classList.add('open');
-}
-function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
-}
-// Close modal on background click
-document.querySelectorAll('.modal-bg').forEach(bg => {
-  bg.addEventListener('click', function(e) {
-    if (e.target === this) this.classList.remove('open');
-  });
-});
-
-// ══════════════════════════════════════════
-//  TOAST
-// ══════════════════════════════════════════
-function toast(msg, type = 'info') {
-  const icons = { success: 'ti-check', error: 'ti-x', info: 'ti-info-circle' };
-  const el = document.createElement('div');
-  el.className = 'toast ' + type;
-  el.innerHTML = `<i class="ti ${icons[type] || 'ti-info-circle'}" style="font-size:16px"></i> ${msg}`;
-  document.getElementById('toast-container').appendChild(el);
-  setTimeout(() => el.remove(), 3000);
-}
-
-// ══════════════════════════════════════════
-//  CSV EXPORT
-// ══════════════════════════════════════════
-function downloadCSV(csv, filename) {
-  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-// ══════════════════════════════════════════
-//  LIVE TIMERS (tick every second)
-// ══════════════════════════════════════════
-setInterval(() => {
-  document.querySelectorAll('.timer[data-checkin]').forEach(el => {
-    const status = el.dataset.status;
-    if (status === 'Checked Out') return;
-    const secs = durationSecs(el.dataset.checkin);
-    el.textContent = fmtDuration(el.dataset.checkin);
-    el.className = 'timer ' + (secs > 14400 ? 'danger' : secs > 10800 ? 'warn' : '');
-  });
-
-  // Update realtime page stats
-  if (currentPage === 'realtime') {
-    const inside = DB.visitors().filter(v => v.status === 'Inside' || v.status === 'Overstay');
-    if (inside.length > 0) {
-      let longest = inside.reduce((a,b) => durationSecs(a.checkIn) > durationSecs(b.checkIn) ? a : b);
-      const longestEl = document.getElementById('rt-longest');
-      if (longestEl) longestEl.textContent = fmtDuration(longest.checkIn);
-    }
-  }
-
-  // check overstay every 30s
-  if (Math.floor(Date.now()/1000) % 30 === 0) checkAlerts();
-}, 1000);
-
-// ══════════════════════════════════════════
-//  UPDATE TOPBAR TIME
-// ══════════════════════════════════════════
-function updateTime() {
-  const el = document.getElementById('page-sub');
-  if (currentPage === 'dashboard') {
-    const now2 = new Date();
-    el.textContent = now2.toLocaleDateString('id-ID', {weekday:'long', day:'2-digit', month:'long', year:'numeric'}) + ' · ' + now2.toLocaleTimeString('id-ID');
-  }
-}
-setInterval(updateTime, 1000);
-
-// ══════════════════════════════════════════
-//  INIT
-// ══════════════════════════════════════════
-// DENGAN INI:
-function fetchGAS(params) {
-  return new Promise((resolve, reject) => {
-    const cbName = 'gasCb_' + Math.random().toString(36).slice(2);
-    const url = GAS_URL + '?' + new URLSearchParams({ ...params, callback: cbName });
-    const script = document.createElement('script');
-    script.src = url;
-    const timer = setTimeout(() => { cleanup(); reject(new Error('Timeout')); }, 10000);
-    window[cbName] = (data) => { cleanup(); resolve(data); };
-    function cleanup() {
-      clearTimeout(timer);
-      delete window[cbName];
-      if (script.parentNode) document.body.removeChild(script);
-    }
-    script.onerror = () => { cleanup(); reject(new Error('Script error')); };
-    document.body.appendChild(script);
-  });
-}
-
-async function loadFromGAS() {
-  if (!GAS_URL) { seedIfEmpty(); renderDashboard(); return; }
-  toast('Memuat data dari Google Sheets...', 'info');
   try {
-    const [dataV, dataE] = await Promise.all([
-      fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'Visitors' }),
-      fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'Equipment' }),
-    ]);
+    scanStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width:{ideal:1280}, height:{ideal:720} }
+    });
+    video.srcObject = scanStream;
+    await new Promise(resolve => { video.onloadedmetadata = resolve; });
+    video.play();
 
-    if (dataV.rows && dataV.rows.length > 0) {
-      const visitors = dataV.rows.map(r => ({
-        // Common
-        id:           r[0],
-        visitorType:  r[1] || 'Guest',
-        name:         r[2],
-        company:      r[3],
-        phone:        r[4],
-        identity:     r[5],
-        purpose:      r[6],
-        host:         r[7],
-        dept:         r[8],
-        notes:        r[9],
-        status:       r[10],
-        checkIn:      r[11],
-        checkOut:     r[12] || null,
-        // duration r[13] — tidak perlu, dihitung live
-        // Contractor
-        area:         r[14],
-        // purpose sudah di r[6], r[15] = Jenis Pekerjaan (sama)
-        personil:     r[16],
-        spk:          r[17],
-        startDate:    r[18],
-        endDate:      r[19],
-        equipList:    r[20] ? r[20].split(';').map(s => { const p = s.trim().match(/^(.+)\((\d+)\)$/); return p ? { nama: p[1].trim(), qty: p[2] } : { nama: s.trim(), qty: '1' }; }) : [],
-        slaStart:     r[21] || null,
-        // r[22] SLA Duration
-        // Driver
-        plate:        r[23],
-        vehicle:      r[24],
-        cargo:        r[25],
-        driverApproved: r[26] === 'TRUE',
-        approvedAt:   r[27] || null,
-        gatePassOut:  r[28] || null,
-        // Employee Test
-        nik:          r[29],
-        jabatan:      r[30],
-        // Auditor
-        auditType:    r[31],
-        scope:        r[32],
-        suratTugas:   r[33],
-        // Meta
-        createdAt:    r[34],
-      })).filter(v => v.id && v.name);
-      if (visitors.length > 0) DB.setVisitors(visitors);
-    }
+    vf.classList.remove('hidden');
+    document.getElementById('scan-idle-icon').classList.add('hidden');
+    btnIcon.className = 'ti ti-x';
+    btnLbl.textContent = 'Stop Kamera';
+    btn.classList.add('stop');
+    document.getElementById('scan-box-title').textContent = 'Menunggu QR Code...';
+    document.getElementById('scan-box-sub').textContent = 'Arahkan kamera ke QR Code visitor.';
+    scanning = true;
 
-    if (dataE.rows && dataE.rows.length > 0) {
-      const equipment = dataE.rows.map(r => ({
-        id:        r[0],
-        name:      r[1],
-        serial:    r[2],
-        owner:     r[3],
-        gatePass:  r[4],
-        condition: r[5],
-        status:    r[6],
-        notes:     r[7],
-        dateIn:    r[8],
-        dateOut:   r[9] || null,
-      })).filter(e => e.id && e.name);
-      if (equipment.length > 0) DB.setEquipment(equipment);
-    }
+    const canvas = document.getElementById('qr-canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-    toast('Data berhasil dimuat dari Google Sheets', 'success');
-  } catch (err) {
-    console.warn('Gagal load dari GAS:', err.message);
-    seedIfEmpty();
-    toast('Gagal load Sheets — pakai data lokal', 'info');
-  }
-  renderDashboard();
-  checkAlerts();
-}
+    scanInterval = setInterval(() => {
+      if (!scanning) return;
+      if (!video.videoWidth || video.readyState < 2) return;
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'dontInvert',
+      });
+      if (code && code.data) {
+        stopScan();
+        processQRData(code.data);
+      }
+    }, 300);
 
-// ══════════════════════════════════════════
-//  BOTTOM NAV SYNC
-// ══════════════════════════════════════════
-const bottomNavPages = ['dashboard','visitors','realtime'];
-
-function setBottomNav(page) {
-  document.querySelectorAll('.bn-item').forEach(el => el.classList.remove('active'));
-  const target = document.getElementById('bn-' + page);
-  if (target) target.classList.add('active');
-  // update visitor badge on bottom nav
-  const inside = DB.visitors().filter(v => v.status === 'Inside' || v.status === 'Overstay').length;
-  const bnBadge = document.getElementById('bn-badge-visitors');
-  if (bnBadge) {
-    bnBadge.textContent = inside;
-    bnBadge.style.display = inside > 0 ? '' : 'none';
+  } catch(e) {
+    alert('Tidak dapat mengakses kamera: ' + (e.message || e));
   }
 }
 
-// ══════════════════════════════════════════
-//  HISTORY API — Back swipe support
-// ══════════════════════════════════════════
-// ══════════════════════════════════════════
-//  HISTORY API — Back swipe support
-// ══════════════════════════════════════════
+function stopScan() {
+  if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+  if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+  scanning = false;
+  const vf = document.getElementById('viewfinder');
+  if (vf) vf.classList.add('hidden');
+  const icon = document.getElementById('scan-idle-icon');
+  if (icon) icon.classList.remove('hidden');
+  const btnIcon = document.getElementById('scan-btn-icon');
+  const btnLbl  = document.getElementById('scan-btn-label');
+  const btn     = document.getElementById('btn-scan-toggle');
+  if (btnIcon) btnIcon.className = 'ti ti-camera';
+  if (btnLbl)  btnLbl.textContent = 'Aktifkan Kamera';
+  if (btn)     btn.classList.remove('stop');
+  const title = document.getElementById('scan-box-title');
+  const sub   = document.getElementById('scan-box-sub');
+  if (title) title.textContent = 'Siap Scan QR';
+  if (sub)   sub.textContent = 'Tekan tombol di bawah untuk mengaktifkan kamera dan scan QR Code visitor.';
+}
 
-// Override nav langsung — tidak pakai _origNav untuk menghindari infinite loop
-const _navCore = function(page, el) {
-  if (sidebarOpen) toggleSidebar();
-  document.querySelectorAll('[id^="page-"]').forEach(p => p.style.display = 'none');
-  document.getElementById('page-' + page).style.display = '';
-  document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
-  if (el) el.classList.add('active');
-  const [title, sub] = pageTitles[page] || [page, ''];
-  document.getElementById('page-title').textContent = title;
-  document.getElementById('page-sub').textContent = sub;
-  currentPage = page;
-  const ta = document.getElementById('topbar-actions');
-  ta.innerHTML = '';
-  if (page === 'equipment') {
-    ta.innerHTML = '<button class="btn btn-primary" onclick="openModal(\'modal-equipment\')"><i class="ti ti-plus"></i> Add Equipment</button>';
-  } else if (page === 'emergency') {
-    ta.innerHTML = '<button class="btn btn-danger" onclick="exportEmergency()"><i class="ti ti-download"></i> Export Muster Report</button>';
+async function processQRData(raw) {
+  let id;
+  try {
+    const data = JSON.parse(raw);
+    id = data.id;
+    if (!id) throw new Error('no id');
+  } catch(e) {
+    id = raw.trim().toUpperCase();
   }
-  renderPage(page);
-  setBottomNav(page);
-};
 
-// Ganti fungsi nav global
-nav = function(page, el) {
-  if (page !== currentPage) {
-    history.pushState({ page }, '', '#' + page);
-  }
-  _navCore(page, el);
-};
-
-// Handle back gesture browser/OS
-window.addEventListener('popstate', function(e) {
-  if (sidebarOpen) {
-    sidebarOpen = false;
-    document.getElementById('sidebar').classList.remove('open');
-    document.getElementById('sb-overlay').classList.remove('show');
-    document.querySelector('.main').classList.remove('pushed');
-    document.body.style.overflow = '';
+  let entry = findVisitor(id);
+  if (entry) {
+    document.getElementById('scan-result').innerHTML = '';
+    renderVisitorCard(entry, 'scan-result');
     return;
   }
-  const page = (e.state && e.state.page) ? e.state.page : 'dashboard';
-  _navCore(page, null);
+
+  document.getElementById('loading').classList.add('show');
+  entry = await findVisitorRemote(id);
+  document.getElementById('loading').classList.remove('show');
+
+  console.log('REMOTE ENTRY:', entry);
+
+  if (entry) {
+    document.getElementById('scan-result').innerHTML = '';
+    renderVisitorCard(entry, 'scan-result');
+  } else {
+    document.getElementById('scan-result').innerHTML = notFoundHtml();
+  }
+}
+
+// ── MANUAL SEARCH ──
+async function searchByID() {
+  const vid = document.getElementById('inp-vid').value.trim().toUpperCase();
+  const f   = document.getElementById('f-vid');
+  if (!vid) { f.classList.add('has-error'); return; }
+  f.classList.remove('has-error');
+
+  let entry = findVisitor(vid);
+  if (entry) {
+    document.getElementById('manual-result').innerHTML = '';
+    renderVisitorCard(entry, 'manual-result');
+    return;
+  }
+
+  // Fallback: cari di Google Sheets
+  document.getElementById('loading').classList.add('show');
+  entry = await findVisitorRemote(vid);
+  document.getElementById('loading').classList.remove('show');
+
+  if (entry) {
+    document.getElementById('manual-result').innerHTML = '';
+    renderVisitorCard(entry, 'manual-result');
+  } else {
+    f.classList.add('has-error');
+    document.getElementById('manual-result').innerHTML = '';
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && document.getElementById('tab-manual').classList.contains('active')) {
+    searchByID();
+  }
 });
 
-// Set initial history state
-history.replaceState({ page: 'dashboard' }, '', '#dashboard');
+// ── COLUMN INDEX (sesuai HEADERS.Visitors di Code.gs) ──
+const VCOL = {
+  id:0, visitorType:1, name:2, company:3, phone:4, identity:5,
+  purpose:6, host:7, dept:8, notes:9, status:10,
+  checkIn:11, checkOut:12, duration:13,
+};
 
-// ══════════════════════════════════════════
-//  INIT
-// ══════════════════════════════════════════
-loadFromGAS();
-addAudit('LOGIN', 'SYSTEM', 'Prasad Seeds P2 — Security Officer — login');
+function rowToVisitor(r) {
+  return {
+    id:          r[VCOL.id]          || '',
+    visitorType: r[VCOL.visitorType] || 'Guest',
+    name:        r[VCOL.name]        || '',
+    company:     r[VCOL.company]     || '',
+    phone:       r[VCOL.phone]       || '',
+    purpose:     r[VCOL.purpose]     || '',
+    host:        r[VCOL.host]        || '',
+    dept:        r[VCOL.dept]        || '',
+    status:      r[VCOL.status]      || '',
+    checkIn:     r[VCOL.checkIn]     || '',
+    checkOut:    r[VCOL.checkOut]    || '',
+  };
+}
+
+// ── FIND VISITOR (localStorage dulu, lalu fallback ke GAS) ──
+function findVisitor(id) {
+  return DB.visitors().find(v => v.id === id) || null;
+}
+
+async function findVisitorRemote(id) {
+  if (!GAS_URL) return null;
+  try {
+    const res = await fetch(`${GAS_URL}?action=GET_SHEET_DATA&sheet=Visitors`);
+    const json = await res.json();
+    if (!json.ok || !json.rows) return null;
+    const row = json.rows.find(r => String(r[VCOL.id]) === String(id));
+    return row ? rowToVisitor(row) : null;
+  } catch (e) {
+    console.warn('GAS lookup failed:', e);
+    return null;
+  }
+}
+
+// ── RENDER VISITOR CARD ──
+function renderVisitorCard(entry, containerId) {
+  currentEntry = entry;
+  const cfg      = getTypeCfg(entry.visitorType);
+  const isOut    = !!entry.checkOut;
+  const container = document.getElementById(containerId);
+
+  let statusHtml = '';
+  if (isOut) {
+    statusHtml = `<span class="status-pill checkedout"><i class="ti ti-check"></i> Sudah Checkout</span>`;
+  } else if (entry.status === 'Approved') {
+    statusHtml = `<span class="status-pill approved"><i class="ti ti-circle-check"></i> Approved</span>`;
+  } else {
+    statusHtml = `<span class="status-pill waiting"><i class="ti ti-clock"></i> Menunggu</span>`;
+  }
+
+  const rows = [
+    { label:'Tipe',         value: entry.visitorType },
+    { label:'Perusahaan',   value: entry.company && entry.company!=='—' ? entry.company : null },
+    { label:'Keperluan',    value: entry.purpose },
+    { label:'Host / PIC',   value: entry.host },
+    { label:'Departemen',   value: entry.dept || null },
+    { label:'Check-In',     value: fmtTime(entry.checkIn) + (entry.checkOut ? '' : ' (' + elapsed(entry.checkIn) + ')') },
+    entry.checkOut ? { label:'Check-Out', value: fmtTime(entry.checkOut) } : null,
+  ].filter(r => r && r.value);
+
+  const entryJson = JSON.stringify(entry).replace(/"/g, '&quot;');
+  const btnHtml = isOut
+    ? `<div class="btn-checkout" style="background:#9ca3af;cursor:not-allowed;"><i class="ti ti-check"></i> Sudah Checkout</div>`
+    : `<button class="btn-checkout" data-entry="${entryJson}" onclick="openModal(JSON.parse(this.dataset.entry))"><i class="ti ti-logout"></i> Checkout Sekarang</button>`;
+
+  container.innerHTML = `
+    <div class="visitor-card" id="vc-${entry.id}">
+      <div class="vc-header">
+        <div class="vc-avatar" style="background:${cfg.bg}">
+          <i class="ti ${cfg.icon}" style="color:${cfg.color}"></i>
+        </div>
+        <div class="vc-info">
+          <div class="vc-name">${entry.name}</div>
+          <div class="vc-meta">${entry.phone}</div>
+        </div>
+        <div class="vc-status">${statusHtml}</div>
+      </div>
+      <div class="vc-body">
+        ${rows.map(r=>`
+          <div class="vc-row">
+            <div class="vcr-label">${r.label}</div>
+            <div class="vcr-value">${r.value}</div>
+          </div>`).join('')}
+      </div>
+      <div class="vc-id"><i class="ti ti-fingerprint"></i>${entry.id}</div>
+      <div class="vc-actions">
+        ${btnHtml}
+        <button class="btn-clear" onclick="clearResult('${containerId}')" title="Tutup"><i class="ti ti-x"></i></button>
+      </div>
+    </div>`;
+}
+
+function clearResult(containerId) {
+  document.getElementById(containerId).innerHTML = '';
+  if (containerId === 'manual-result') {
+    document.getElementById('inp-vid').value = '';
+    document.getElementById('f-vid').classList.remove('has-error');
+  }
+}
+
+function notFoundHtml() {
+  return `<div class="already-out">
+    <i class="ti ti-user-x"></i>
+    <p>Visitor ID tidak ditemukan.<br>Pastikan ID yang di-scan atau diinput sudah benar.</p>
+  </div>`;
+}
+
+// ── MODAL CHECKOUT ──
+function openModal(entry) {
+  console.log('OPEN MODAL, entry:', entry);
+  if (!entry) return;
+  pendingEntry = entry;
+  document.getElementById('modal-name').textContent = entry.name;
+  document.getElementById('modal-meta').textContent = entry.visitorType + ' · ' + entry.purpose + ' · Masuk ' + elapsed(entry.checkIn) + ' lalu';
+  document.getElementById('modal-confirm').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modal-confirm').classList.remove('show');
+  pendingEntry = null;
+}
+
+async function confirmCheckout() {
+  console.log('CONFIRM CHECKOUT, pendingEntry:', pendingEntry);
+  if (!pendingEntry) return;
+  closeModal();
+  document.getElementById('loading').classList.add('show');
+
+  const checkOutTime = now();
+  const visitors = DB.visitors();
+  const idx = visitors.findIndex(v => v.id === pendingEntry.id);
+  if (idx !== -1) {
+    visitors[idx].checkOut = checkOutTime;
+    visitors[idx].status   = 'Checked Out';
+    DB.setVisitors(visitors);
+  }
+  const updated = { ...pendingEntry, checkOut: checkOutTime, status: 'Checked Out' };
+
+  // Send to GAS (fire-and-forget, jangan blokir UI)
+  sendToGAS('CHECKOUT_VISITOR', { id: updated.id, checkOut: checkOutTime, status: 'Checked Out' })
+    .catch(e => console.warn('GAS checkout failed:', e));
+  sendToGAS('ADD_LOG', {
+    action: 'CHECKOUT', entity: 'VISITOR',
+    detail: `[${updated.visitorType}] ${updated.name} — checkout`,
+    user: 'Security', ts: checkOutTime,
+  }).catch(e => {});
+
+  document.getElementById('loading').classList.remove('show');
+  showCheckoutSuccess(updated);
+}
+
+async function sendToGAS(action, data, timeoutMs = 8000) {
+  if (!GAS_URL) return;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    await fetch(GAS_URL, {
+      method:'POST', mode:'no-cors',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action, data }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ── SHOW CHECKOUT SUCCESS ──
+function showCheckoutSuccess(entry) {
+  console.log('SHOW SUCCESS entry:', JSON.stringify(entry));
+  const cfg = getTypeCfg(entry.visitorType);
+  const dur = durationStr(entry.checkIn, entry.checkOut);
+  const successHtml = `
+    <div class="checkout-success">
+      <div class="cs-header">
+        <div class="cs-icon"><i class="ti ti-logout"></i></div>
+        <div>
+          <div class="cs-title">Checkout Berhasil</div>
+          <div class="cs-sub">${entry.name} telah selesai kunjungan</div>
+        </div>
+      </div>
+      <div class="cs-rows">
+        <div class="cs-row"><div class="cs-label">Nama</div><div class="cs-value">${entry.name}</div></div>
+        <div class="cs-row"><div class="cs-label">Tipe</div><div class="cs-value">${entry.visitorType}</div></div>
+        <div class="cs-row"><div class="cs-label">Check-In</div><div class="cs-value">${fmtTime(entry.checkIn)}</div></div>
+        <div class="cs-row"><div class="cs-label">Check-Out</div><div class="cs-value">${fmtTime(entry.checkOut)}</div></div>
+        <div class="cs-row"><div class="cs-label">Durasi</div><div class="cs-value">${dur}</div></div>
+      </div>
+      <button class="btn-done" onclick="clearAfterCheckout()">
+        <i class="ti ti-check"></i> Selesai
+      </button>
+    </div>`;
+
+  // Show in active tab
+  const activeTab = document.querySelector('.tab-panel.active').id;
+  const resultId  = activeTab === 'tab-scan' ? 'scan-result' : activeTab === 'tab-manual' ? 'manual-result' : null;
+  if (resultId) {
+    document.getElementById(resultId).innerHTML = successHtml;
+  } else {
+    renderActiveList();
+  }
+}
+
+function clearAfterCheckout() {
+  document.getElementById('scan-result').innerHTML   = '';
+  document.getElementById('manual-result').innerHTML = '';
+  document.getElementById('inp-vid').value = '';
+  if (document.getElementById('tab-list').classList.contains('active')) renderActiveList();
+}
+
+function durationStr(inIso, outIso) {
+  if (!inIso || !outIso) return '—';
+  const m = Math.floor((new Date(outIso) - new Date(inIso)) / 60000);
+  if (m < 60) return m + ' menit';
+  const h = Math.floor(m/60), rm = m%60;
+  return h + ' jam ' + rm + ' menit';
+}
+
+// ── ACTIVE LIST ──
+function renderActiveList() {
+  const today    = todayStr();
+  const visitors = DB.visitors().filter(v => v.checkIn && v.checkIn.startsWith(today));
+  const active   = visitors.filter(v => !v.checkOut);
+  const done     = visitors.filter(v => !!v.checkOut);
+
+  document.getElementById('active-count').textContent = active.length;
+  const container = document.getElementById('visitor-list-container');
+
+  if (visitors.length === 0) {
+    container.innerHTML = `<div class="empty-state"><i class="ti ti-users"></i><p>Belum ada visitor hari ini.</p></div>`;
+    return;
+  }
+
+  let html = '';
+
+  if (active.length > 0) {
+    html += `<div class="list-title" style="margin-bottom:10px;font-size:13px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Masih Di Dalam (${active.length})</div>`;
+    html += '<div class="visitor-list">';
+    active.forEach(v => { html += visitorListItem(v); });
+    html += '</div>';
+  }
+
+  if (done.length > 0) {
+    html += `<div class="list-title" style="margin:18px 0 10px;font-size:13px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Sudah Checkout (${done.length})</div>`;
+    html += '<div class="visitor-list">';
+    done.forEach(v => { html += visitorListItem(v, true); });
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+function visitorListItem(v, isOut=false) {
+  const cfg = getTypeCfg(v.visitorType);
+  const timeLabel = isOut
+    ? `<div style="font-size:11px;color:var(--green);font-weight:600;">Out ${elapsed(v.checkOut)} lalu</div>`
+    : `<div style="font-size:11px;color:var(--amber);font-weight:600;">${elapsed(v.checkIn)}</div>`;
+
+  return `<div class="vl-item" onclick="openFromList('${v.id}')">
+    <div class="vl-avatar" style="background:${cfg.bg}">
+      <i class="ti ${cfg.icon}" style="color:${cfg.color}"></i>
+    </div>
+    <div class="vl-info">
+      <div class="vl-name">${v.name}</div>
+      <div class="vl-meta">${v.visitorType} · ${v.purpose}</div>
+    </div>
+    <div class="vl-time">
+      <div style="font-size:12px;color:var(--text3)">${new Date(v.checkIn).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})}</div>
+      ${timeLabel}
+    </div>
+    <i class="ti ti-chevron-right vl-chevron"></i>
+  </div>`;
+}
+
+function openFromList(id) {
+  const entry = findVisitor(id);
+  if (!entry) return;
+  switchTab('manual');
+  document.getElementById('inp-vid').value = id;
+  document.getElementById('manual-result').innerHTML = '';
+  renderVisitorCard(entry, 'manual-result');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ── INIT ──
+renderActiveList();
+// Refresh list every 30s
+setInterval(() => {
+  if (document.getElementById('tab-list').classList.contains('active')) renderActiveList();
+}, 30000);
 </script>
 </body>
 </html>
