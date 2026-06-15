@@ -3073,6 +3073,11 @@ history.replaceState({ page: 'dashboard' }, '', '#dashboard');
 // ══════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════
+// Bersihkan localStorage lama setiap load, biar selalu fresh dari GAS
+localStorage.removeItem('vsm_visitors');
+localStorage.removeItem('vsm_equipment');
+localStorage.removeItem('vsm_alerts');
+
 loadFromGAS();
 addAudit('LOGIN', 'SYSTEM', 'Prasad Seeds P2 — Security Officer — login');
 </script>
