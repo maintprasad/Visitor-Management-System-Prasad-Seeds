@@ -1617,11 +1617,11 @@ function checkAlerts() {
   const equipment = DB.equipment();
   const existAlerts = DB.alerts();
   const newAlerts = [];
+  const visitorIds = new Set(visitors.map(v => v.id));
 
   visitors.filter(v => v.status === 'Inside' || v.status === 'Overstay').forEach(v => {
     const secs = durationSecs(v.checkIn);
     if (secs > 4 * 3600) {
-      // mark as overstay
       v.status = 'Overstay';
       const exists = existAlerts.find(a => a.ref === v.id && a.type === 'OVERSTAY');
       if (!exists) {
@@ -1631,8 +1631,14 @@ function checkAlerts() {
   });
   DB.setVisitors(visitors);
 
+  // Hapus alert yang visitornya sudah tidak ada
+  const filteredExisting = existAlerts.filter(a => {
+    if (a.type === 'OVERSTAY' && a.ref && !visitorIds.has(a.ref)) return false;
+    return true;
+  });
+
   // Keep old + new unique
-  const merged = [...existAlerts];
+  const merged = [...filteredExisting];
   newAlerts.forEach(a => {
     if (!merged.find(x => x.ref === a.ref && x.type === a.type)) merged.unshift(a);
   });
@@ -1803,7 +1809,7 @@ function renderDashboard() {
         <td>${v.host}<div class="td-sub">${v.dept}</div></td>
         <td>${v.purpose}</td>
         <td><div class="mono">${fmtTime(v.checkIn)}</div></td>
-        <td><span class="timer ${durationSecs(v.checkIn) > 14400 ? 'danger' : durationSecs(v.checkIn) > 10800 ? 'warn' : ''}" data-checkin="${v.checkIn}" data-status="${v.status}">${v.status === 'Checked Out' ? fmtDuration(v.checkIn, v.checkOut) : fmtDuration(v.checkIn)}</span></td>
+        <td><span class="timer ${durationSecs(v.checkIn, v.checkOut) > 14400 ? 'danger' : durationSecs(v.checkIn, v.checkOut) > 10800 ? 'warn' : ''}" data-checkin="${v.checkIn}" data-checkout="${v.checkOut || ''}" data-status="${v.status}">${fmtDuration(v.checkIn, v.checkOut)}</span></td>
         <td>${statusPill(v.status)}</td>
         <td>
           <div class="flex-gap8">
@@ -1897,7 +1903,7 @@ function renderVisitorTable() {
           : v.status === 'Waiting Approval'
             ? '<span style="font-size:12px;color:var(--text3)">— Menunggu —</span>'
             : `<span class="timer ${durationSecs(v.checkIn, v.checkOut) > 14400 && v.status !== 'Checked Out' ? 'danger' : ''}"
-                ${v.status !== 'Checked Out' ? `data-checkin="${v.checkIn}" data-status="${v.status}"` : ''}>
+                data-checkin="${v.checkIn}" data-checkout="${v.checkOut || ''}" data-status="${v.status}">
                 ${fmtDuration(v.checkIn, v.checkOut)}</span>`
         }
       </td>
@@ -2150,7 +2156,7 @@ function renderRealtime() {
       <td>${v.company}</td>
       <td>${v.host}<div class="td-sub">${v.dept}</div></td>
       <td class="mono">${fmtTime(v.checkIn)}</td>
-      <td><span class="timer ${durationSecs(v.checkIn) > 14400 ? 'danger' : durationSecs(v.checkIn) > 10800 ? 'warn' : ''}" data-checkin="${v.checkIn}" data-status="${v.status}">${fmtDuration(v.checkIn)}</span></td>
+      <td><span class="timer ${durationSecs(v.checkIn) > 14400 ? 'danger' : durationSecs(v.checkIn) > 10800 ? 'warn' : ''}" data-checkin="${v.checkIn}" data-checkout="" data-status="${v.status}">${fmtDuration(v.checkIn)}</span></td>
       <td>${statusPill(v.status)}</td>
       <td><button class="btn btn-sm btn-success" onclick="doCheckout('${v.id}')"><i class="ti ti-logout"></i> Check Out</button></td>
     </tr>
@@ -2216,7 +2222,7 @@ function renderEmergency() {
       <td>${v.company}</td>
       <td>${v.host}<div class="td-sub">${v.dept}</div></td>
       <td class="mono">${fmtDateTime(v.checkIn)}</td>
-      <td><span class="timer ${durationSecs(v.checkIn) > 14400 ? 'danger' : ''}" data-checkin="${v.checkIn}" data-status="${v.status}">${fmtDuration(v.checkIn)}</span></td>
+      <td><span class="timer ${durationSecs(v.checkIn) > 14400 ? 'danger' : ''}" data-checkin="${v.checkIn}" data-checkout="" data-status="${v.status}">${fmtDuration(v.checkIn)}</span></td>
       <td>${statusPill(v.status)}</td>
     </tr>
   `).join('');
@@ -2605,16 +2611,15 @@ function deleteVisitor(id) {
   const visitors = DB.visitors();
   const v = visitors.find(x => x.id === id);
   DB.setVisitors(visitors.filter(x => x.id !== id));
+  markDeleted('Visitors', id);
   addAudit('DELETE', 'VISITOR', (v?.name || id) + ' — data dihapus');
   toast('Data visitor dihapus', 'info');
   renderPage(currentPage);
   // Kirim ke Google Sheets
-  sendToGAS('ADD_LOG', {
-    action: 'DELETE', entity: 'VISITOR',
-    refId: id,
-    detail: (v?.name || id) + ' — data dihapus',
+  sendToGAS('DELETE_ROW', {
+    sheet: 'Visitors',
+    id: id,
     user: document.getElementById('sb-uname').textContent,
-    ts: now(),
   });
 }
 
@@ -2695,16 +2700,15 @@ function deleteEquip(id) {
   const equipment = DB.equipment();
   const eq = equipment.find(x => x.id === id);
   DB.setEquipment(equipment.filter(x => x.id !== id));
+  markDeleted('Equipment', id);
   addAudit('DELETE', 'EQUIPMENT', (eq?.name || id) + ' — dihapus');
   toast('Equipment dihapus', 'info');
   renderPage(currentPage);
   // Kirim ke Google Sheets
-  sendToGAS('ADD_LOG', {
-    action: 'DELETE', entity: 'EQUIPMENT',
-    refId: id,
-    detail: (eq?.name || id) + ' — dihapus',
+  sendToGAS('DELETE_ROW', {
+    sheet: 'Equipment',
+    id: id,
     user: document.getElementById('sb-uname').textContent,
-    ts: now(),
   });
 }
 
@@ -2845,6 +2849,8 @@ setInterval(() => {
   document.querySelectorAll('.timer[data-checkin]').forEach(el => {
     const status = el.dataset.status;
     if (status === 'Checked Out') return;
+    const checkout = el.dataset.checkout;
+    if (checkout) return; // sudah checkout, jangan tick
     const secs = durationSecs(el.dataset.checkin);
     el.textContent = fmtDuration(el.dataset.checkin);
     el.className = 'timer ' + (secs > 14400 ? 'danger' : secs > 10800 ? 'warn' : '');
@@ -2898,6 +2904,15 @@ function fetchGAS(params) {
   });
 }
 
+function getDeletedIds(sheet) {
+  return JSON.parse(localStorage.getItem('vsm_deleted_' + sheet) || '[]');
+}
+function markDeleted(sheet, id) {
+  const ids = getDeletedIds(sheet);
+  if (!ids.includes(id)) ids.push(id);
+  localStorage.setItem('vsm_deleted_' + sheet, JSON.stringify(ids));
+}
+
 async function loadFromGAS() {
   if (!GAS_URL) { seedIfEmpty(); renderDashboard(); return; }
   toast('Memuat data dari Google Sheets...', 'info');
@@ -2906,6 +2921,9 @@ async function loadFromGAS() {
       fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'Visitors' }),
       fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'Equipment' }),
     ]);
+
+    const deletedV = getDeletedIds('Visitors');
+    const deletedE = getDeletedIds('Equipment');
 
     if (dataV.rows && dataV.rows.length > 0) {
       const visitors = dataV.rows.map(r => ({
@@ -2950,7 +2968,7 @@ async function loadFromGAS() {
         suratTugas:   r[33],
         // Meta
         createdAt:    r[34],
-      })).filter(v => v.id && v.name);
+      })).filter(v => v.id && v.name && !deletedV.includes(v.id));
       if (visitors.length > 0) DB.setVisitors(visitors);
     }
 
@@ -2966,7 +2984,7 @@ async function loadFromGAS() {
         notes:     r[7],
         dateIn:    r[8],
         dateOut:   r[9] || null,
-      })).filter(e => e.id && e.name);
+      })).filter(e => e.id && e.name && !deletedE.includes(e.id));
       if (equipment.length > 0) DB.setEquipment(equipment);
     }
 
