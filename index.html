@@ -1975,13 +1975,12 @@ function renderVisitorTable() {
       <td>${v.host}<div class="td-sub">${v.dept || ''}</div></td>
       <td class="mono">${fmtDateTime(v.checkIn)}</td>
       <td>
-        ${v.visitorType === 'Contractor'
-          ? getSLADisplay(v.slaStart)
-          : v.status === 'Waiting Approval'
-            ? '<span style="font-size:12px;color:var(--text3)">— Menunggu —</span>'
-            : `<span class="timer ${durationSecs(v.checkIn, v.checkOut) > 14400 && v.status !== 'Checked Out' ? 'danger' : ''}"
-                data-checkin="${v.checkIn}" data-checkout="${v.checkOut || ''}" data-status="${v.status}">
-                ${fmtDuration(v.checkIn, v.checkOut)}</span>`
+        ${v.status === 'Waiting Approval' && !v.slaStart
+          ? '<span style="font-size:12px;color:var(--text3)">— Menunggu —</span>'
+          : `<span class="timer ${durationSecs(v.visitorType === 'Contractor' ? (v.slaStart || v.checkIn) : v.checkIn, v.checkOut) > 14400 && v.status !== 'Checked Out' ? 'danger' : durationSecs(v.visitorType === 'Contractor' ? (v.slaStart || v.checkIn) : v.checkIn, v.checkOut) > 10800 ? 'warn' : ''}"
+              data-checkin="${v.visitorType === 'Contractor' ? (v.slaStart || v.checkIn) : v.checkIn}"
+              data-checkout="${v.checkOut || ''}" data-status="${v.status}">
+              ${fmtDuration(v.visitorType === 'Contractor' ? (v.slaStart || v.checkIn) : v.checkIn, v.checkOut)}</span>`
         }
       </td>
       <td>${statusPill(v.status)}</td>
@@ -1990,7 +1989,7 @@ function renderVisitorTable() {
           <button class="btn btn-sm" onclick="openDetail('${v.id}')"><i class="ti ti-eye"></i></button>
           ${v.visitorType === 'Driver' && v.status !== 'Checked Out'
             ? `<button class="btn btn-sm btn-primary" onclick="openDriverApproval('${v.id}')"><i class="ti ti-truck"></i> Approval</button>`
-            : `${(v.status === 'Waiting Approval' || (v.visitorType === 'Contractor' && !v.slaStart))
+            : `${(v.status === 'Waiting Approval')
                 ? `<button class="btn btn-sm btn-primary" onclick="approveVisitor('${v.id}')"><i class="ti ti-check"></i></button>`
                 : ''}
                ${v.status !== 'Checked Out' ? `<button class="btn btn-sm btn-success" onclick="doCheckout('${v.id}')"><i class="ti ti-logout"></i></button>` : ''}`
@@ -2039,6 +2038,7 @@ function getSLADisplay(slaStart) {
   if (!slaStart) return '<span class="sla-badge sla-warn"><i class="ti ti-clock"></i> Menunggu Approval</span>';
   const secs = durationSecs(slaStart);
   const label = fmtDuration(slaStart);
+  // note: caller harus render elemen dengan class timer + data-checkin agar live tick berjalan
   if (secs < 8 * 3600)  return `<span class="sla-badge sla-ok"><i class="ti ti-clock"></i> ${label}</span>`;
   if (secs < 12 * 3600) return `<span class="sla-badge sla-warn"><i class="ti ti-alert-triangle"></i> ${label}</span>`;
   return `<span class="sla-badge sla-over"><i class="ti ti-alert-circle"></i> ${label}</span>`;
@@ -3332,6 +3332,45 @@ function deleteAbsen(id) {
 }
 
 loadFromGAS();
+
+// Auto-refresh dari GAS setiap 30 detik
+setInterval(async () => {
+  if (!GAS_URL) return;
+  try {
+    const [dataV, dataE] = await Promise.all([
+      fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'Visitors' }),
+      fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'Equipment' }),
+    ]);
+    const deletedV = getDeletedIds('Visitors');
+    const deletedE = getDeletedIds('Equipment');
+    if (dataV.rows) {
+      const visitors = dataV.rows
+        .map(r => ({
+          id: r[0], visitorType: (r[1] || 'Guest'), name: r[2], company: r[3],
+          phone: r[4], identity: r[5], purpose: r[6], host: r[7], dept: r[8],
+          notes: r[9], status: (r[10] || '').trim(), checkIn: r[11], checkOut: r[12] || null,
+          area: r[14], personil: r[16], spk: r[17], startDate: r[18], endDate: r[19],
+          equipList: r[20] ? r[20].split(';').map(s => { const p = s.trim().match(/^(.+)\((\d+)\)$/); return p ? { nama: p[1].trim(), qty: p[2] } : { nama: s.trim(), qty: '1' }; }) : [],
+          slaStart: r[21] || null, plate: r[23], vehicle: r[24], cargo: r[25],
+          driverApproved: r[26] === 'TRUE', approvedAt: r[27] || null, gatePassOut: r[28] || null,
+          nik: r[29], jabatan: r[30], auditType: r[31], scope: r[32], suratTugas: r[33],
+          createdAt: r[34] || r[11],
+        }))
+        .filter(v => v.id && !deletedV.includes(v.id));
+      DB.setVisitors(visitors);
+    }
+    if (dataE.rows) {
+      const equipment = dataE.rows
+        .map(r => ({ id: r[0], name: r[1], serial: r[2], owner: r[3], gatePass: r[4], condition: r[5], notes: r[6], status: (r[7] || '').trim(), dateIn: r[8], dateOut: r[9] || null }))
+        .filter(e => e.id && !deletedE.includes(e.id));
+      DB.setEquipment(equipment);
+    }
+    renderPage(currentPage);
+  } catch(e) {
+    // silent fail — jangan toast supaya tidak ganggu user
+    console.warn('Auto-refresh gagal:', e);
+  }
+}, 10000);
 addAudit('LOGIN', 'SYSTEM', 'Prasad Seeds P2 — Security Officer — login');
 </script>
 </body>
