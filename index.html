@@ -1990,7 +1990,9 @@ function renderVisitorTable() {
           <button class="btn btn-sm" onclick="openDetail('${v.id}')"><i class="ti ti-eye"></i></button>
           ${v.visitorType === 'Driver' && v.status !== 'Checked Out'
             ? `<button class="btn btn-sm btn-primary" onclick="openDriverApproval('${v.id}')"><i class="ti ti-truck"></i> Approval</button>`
-            : `${v.status === 'Waiting Approval' ? `<button class="btn btn-sm btn-primary" onclick="approveVisitor('${v.id}')"><i class="ti ti-check"></i></button>` : ''}
+            : `${(v.status === 'Waiting Approval' || (v.visitorType === 'Contractor' && !v.slaStart))
+                ? `<button class="btn btn-sm btn-primary" onclick="approveVisitor('${v.id}')"><i class="ti ti-check"></i></button>`
+                : ''}
                ${v.status !== 'Checked Out' ? `<button class="btn btn-sm btn-success" onclick="doCheckout('${v.id}')"><i class="ti ti-logout"></i></button>` : ''}`
           }
           <button class="btn btn-sm btn-danger" onclick="deleteVisitor('${v.id}')"><i class="ti ti-trash"></i></button>
@@ -3015,7 +3017,7 @@ async function loadFromGAS() {
         host:         r[7],
         dept:         r[8],
         notes:        r[9],
-        status:       r[10],
+        status:       (r[10] || '').trim(),
         checkIn:      r[11],
         checkOut:     r[12] || null,
         // duration r[13] — tidak perlu, dihitung live
