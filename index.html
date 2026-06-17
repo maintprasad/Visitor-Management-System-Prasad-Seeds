@@ -853,7 +853,7 @@ textarea { resize: vertical; min-height: 72px; }
           <i class="ti ti-search"></i>
           <input type="text" class="search-input" id="equip-search" placeholder="Search equipment..." oninput="renderEquipmentTable()">
         </div>
-        <button class="btn btn-primary" onclick="openModal('modal-equipment')"><i class="ti ti-plus"></i> Add Equipment</button>
+        <button class="btn btn-primary" onclick="populateEquipContractorLink();openModal('modal-equipment')"><i class="ti ti-plus"></i> Add Equipment</button>
       </div>
       <div class="card" style="padding:0">
         <div class="table-wrap">
@@ -1436,6 +1436,12 @@ textarea { resize: vertical; min-height: 72px; }
         <label>Serial Number</label>
         <input type="text" id="eq-serial" placeholder="SN-XXXX">
       </div>
+      <div class="form-group full">
+        <label>Tautkan ke Contractor (Inside)</label>
+        <select id="eq-link-contractor" onchange="autofillEquipOwner()">
+          <option value="">— Tidak ditautkan / equipment umum —</option>
+        </select>
+      </div>
       <div class="form-group">
         <label>Owner / Pembawa *</label>
         <input type="text" id="eq-owner" placeholder="Nama pembawa">
@@ -1587,6 +1593,27 @@ const DB = {
 
 function genId(prefix) {
   return prefix + '-' + Math.random().toString(36).substr(2,8).toUpperCase();
+}
+
+// Cari semua equipment (dari sheet Equipment) yang terkait dengan seorang visitor,
+// baik karena sudah ditautkan via visitorId, ATAU karena owner-nya cocok dengan
+// nama / company visitor tersebut (untuk data lama yang diinput manual).
+function getLinkedEquipment(visitor) {
+  if (!visitor) return [];
+  const equipment = DB.equipment();
+  const nameLower = (visitor.name || '').trim().toLowerCase();
+  const companyLower = (visitor.company || '').trim().toLowerCase();
+
+  return equipment.filter(e => {
+    if (e.visitorId === visitor.id) return true;
+    if (!e.visitorId) {
+      const ownerLower = (e.owner || '').trim().toLowerCase();
+      if (!ownerLower) return false;
+      if (nameLower && ownerLower === nameLower) return true;
+      if (companyLower && ownerLower === companyLower) return true;
+    }
+    return false;
+  });
 }
 
 function genGatePass() {
@@ -2183,12 +2210,25 @@ function renderEquipmentTable() {
     tbody.innerHTML = '<tr><td colspan="9"><div class="empty"><i class="ti ti-package"></i><p>Tidak ada data equipment</p></div></td></tr>';
     return;
   }
-  tbody.innerHTML = items.map((e, i) => `
+  tbody.innerHTML = items.map((e, i) => {
+    let linkedVisitor = e.visitorId ? DB.visitors().find(v => v.id === e.visitorId) : null;
+    if (!linkedVisitor) {
+      // Fallback: cocokkan lewat nama owner ke nama/company visitor Contractor yang aktif
+      const ownerLower = (e.owner || '').trim().toLowerCase();
+      if (ownerLower) {
+        linkedVisitor = DB.visitors().find(v =>
+          v.visitorType === 'Contractor' &&
+          (v.status === 'Inside' || v.status === 'Overstay') &&
+          ((v.name || '').trim().toLowerCase() === ownerLower || (v.company || '').trim().toLowerCase() === ownerLower)
+        );
+      }
+    }
+    return `
     <tr>
       <td class="mono">${i+1}</td>
       <td><div class="td-main">${e.name}</div><div class="td-sub">${e.notes || ''}</div></td>
       <td class="mono">${e.serial || '—'}</td>
-      <td>${e.owner}</td>
+      <td>${e.owner}${linkedVisitor ? `<div class="td-sub"><span class="pill pill-waiting"><i class="ti ti-hard-hat" style="font-size:10px"></i> ${linkedVisitor.name}</span></div>` : ''}</td>
       <td class="mono">${e.gatePass}</td>
       <td><span class="pill ${e.condition === 'Good / Baik' ? 'pill-good' : 'pill-waiting'}">${e.condition}</span></td>
       <td>${statusPill(e.status)}</td>
@@ -2201,7 +2241,7 @@ function renderEquipmentTable() {
         </div>
       </td>
     </tr>
-  `).join('');
+  `}).join('');
 }
 
 // ══════════════════════════════════════════
@@ -2623,6 +2663,33 @@ function submitCheckinTyped(type) {
   const visitors = DB.visitors();
   visitors.unshift(base);
   DB.setVisitors(visitors);
+
+  // Jika Contractor membawa equipment saat check-in, daftarkan otomatis
+  // ke menu Equipment dan tautkan via visitorId, agar bisa dicek silang saat checkout.
+  if (type === 'Contractor' && base.equipList && base.equipList.length > 0) {
+    const equipment = DB.equipment();
+    base.equipList.forEach(item => {
+      equipment.unshift({
+        id: genId('EQ'),
+        name: item.nama,
+        serial: '',
+        owner: base.name,
+        visitorId: base.id,
+        visitorType: 'Contractor',
+        qty: item.qty || '1',
+        gatePass: genGatePass(),
+        condition: 'Good / Baik',
+        status: 'Inside',
+        notes: 'Auto-generated dari check-in Contractor',
+        dateIn: base.checkIn,
+        dateOut: null,
+        source: 'CONTRACTOR_CHECKIN',
+      });
+    });
+    DB.setEquipment(equipment);
+  }
+
+  markLocalWrite();
   addAudit('CHECK_IN', 'VISITOR', `[${type}] ${name} — ${purpose}`);
   closeModal(modalId);
   toast(`${name} (${type}) berhasil check in!`, 'success');
@@ -2709,11 +2776,29 @@ function deleteVisitor(id) {
   });
 }
 
+function populateEquipContractorLink() {
+  const sel = document.getElementById('eq-link-contractor');
+  if (!sel) return;
+  const activeContractors = DB.visitors().filter(v => v.visitorType === 'Contractor' && (v.status === 'Inside' || v.status === 'Overstay'));
+  sel.innerHTML = '<option value="">— Tidak ditautkan / equipment umum —</option>' +
+    activeContractors.map(v => `<option value="${v.id}">${v.name} — ${v.company || ''} (${v.area || '—'})</option>`).join('');
+}
+
+function autofillEquipOwner() {
+  const id = document.getElementById('eq-link-contractor').value;
+  if (!id) return;
+  const v = DB.visitors().find(x => x.id === id);
+  if (v) document.getElementById('eq-owner').value = v.name;
+}
+
 async function submitEquipment() {
   const name = document.getElementById('eq-name').value.trim();
   const owner = document.getElementById('eq-owner').value.trim();
   if (!name || !owner) { toast('Lengkapi field wajib', 'error'); return; }
- 
+
+  const visitorId = document.getElementById('eq-link-contractor')?.value || null;
+  const linkedVisitor = visitorId ? DB.visitors().find(x => x.id === visitorId) : null;
+
   const eq = {
     id: genId('EQ'),
     name, owner,
@@ -2723,16 +2808,22 @@ async function submitEquipment() {
     status: document.getElementById('eq-status').value,
     notes: document.getElementById('eq-notes').value.trim(),
     dateIn: now(), dateOut: null,
+    visitorId: visitorId || null,
+    visitorType: linkedVisitor ? linkedVisitor.visitorType : null,
+    source: linkedVisitor ? 'EQUIPMENT_MENU_LINKED' : 'EQUIPMENT_MENU',
     user: document.getElementById('sb-uname').textContent,
   };
  
   const equipment = DB.equipment();
   equipment.unshift(eq);
   DB.setEquipment(equipment);
-  addAudit('CREATE', 'EQUIPMENT', `${name} — ${owner} — ${eq.gatePass}`);
+  markLocalWrite();
+  addAudit('CREATE', 'EQUIPMENT', `${name} — ${owner} — ${eq.gatePass}` + (linkedVisitor ? ` — ditautkan ke ${linkedVisitor.name}` : ''));
   closeModal('modal-equipment');
   toast(name + ' berhasil ditambahkan', 'success');
   ['eq-name','eq-serial','eq-owner','eq-gatepass','eq-notes'].forEach(id => document.getElementById(id).value = '');
+  const linkSel = document.getElementById('eq-link-contractor');
+  if (linkSel) linkSel.selectedIndex = 0;
   renderPage(currentPage);
  
   // Kirim ke Google Sheets
@@ -2748,6 +2839,7 @@ async function equipCheckout(id) {
   if (!eq) return;
   eq.status = 'Outside'; eq.dateOut = now();
   DB.setEquipment(equipment);
+  markLocalWrite();
   addAudit('CHECK_OUT', 'EQUIPMENT', eq.name + ' — ' + eq.gatePass);
   toast(eq.name + ' berhasil check out', 'success');
   renderPage(currentPage);
@@ -2768,6 +2860,7 @@ function approveEquip(id) {
   if (!eq) return;
   eq.status = 'Inside';
   DB.setEquipment(equipment);
+  markLocalWrite();
   addAudit('UPDATE', 'EQUIPMENT', eq.name + ' — disetujui masuk');
   toast(eq.name + ' disetujui', 'success');
   renderPage(currentPage);
@@ -2787,6 +2880,7 @@ function deleteEquip(id) {
   const eq = equipment.find(x => x.id === id);
   DB.setEquipment(equipment.filter(x => x.id !== id));
   markDeleted('Equipment', id);
+  markLocalWrite();
   addAudit('DELETE', 'EQUIPMENT', (eq?.name || id) + ' — dihapus');
   toast('Equipment dihapus', 'info');
   renderPage(currentPage);
@@ -2856,6 +2950,28 @@ function openDetail(id) {
         <div>${v.notes || '—'}</div>
       </div>
     </div>
+    ${(() => {
+      const linkedEq = getLinkedEquipment(v);
+      if (linkedEq.length === 0) return '';
+      return `
+        <div style="margin-bottom:16px">
+          <label style="font-size:12px;font-weight:500;color:var(--text2);display:block;margin-bottom:8px">
+            Equipment Dibawa <span class="pill pill-pending">${linkedEq.length} item</span>
+          </label>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${linkedEq.map(e => `
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border)">
+                <div>
+                  <div style="font-weight:600;font-size:13px">${e.name}</div>
+                  <div style="font-size:11px;color:var(--text3)">${e.gatePass || '—'}</div>
+                </div>
+                ${statusPill(e.status)}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    })()}
     <!-- Visitor Badge Preview -->
     <div style="margin-top:8px">
       <label style="font-size:12px;font-weight:500;color:var(--text2);display:block;margin-bottom:8px">Visitor Badge Preview</label>
@@ -3122,9 +3238,7 @@ const _navCore = function(page, el) {
   currentPage = page;
   const ta = document.getElementById('topbar-actions');
   ta.innerHTML = '';
-  if (page === 'equipment') {
-    ta.innerHTML = '<button class="btn btn-primary" onclick="openModal(\'modal-equipment\')"><i class="ti ti-plus"></i> Add Equipment</button>';
-  } else if (page === 'emergency') {
+  if (page === 'emergency') {
     ta.innerHTML = '<button class="btn btn-danger" onclick="exportEmergency()"><i class="ti ti-download"></i> Export Muster Report</button>';
   }
   renderPage(page);
@@ -3340,9 +3454,18 @@ function deleteAbsen(id) {
 
 loadFromGAS();
 
-// Auto-refresh dari GAS setiap 30 detik
+// Track kapan terakhir kali user melakukan perubahan lokal (create/edit/delete)
+// supaya auto-refresh tidak menimpa data yang baru saja diubah sebelum sempat tersimpan di Sheets.
+let lastLocalWriteAt = 0;
+function markLocalWrite() { lastLocalWriteAt = Date.now(); }
+
+// Auto-refresh dari GAS setiap 10 detik
 setInterval(async () => {
   if (!GAS_URL) return;
+  // Beri jeda 15 detik setelah perubahan lokal terakhir, agar Google Sheets
+  // punya waktu untuk benar-benar menyimpan baris baru sebelum kita fetch ulang.
+  if (Date.now() - lastLocalWriteAt < 15000) return;
+
   try {
     const [dataV, dataE] = await Promise.all([
       fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'Visitors' }),
@@ -3350,6 +3473,7 @@ setInterval(async () => {
     ]);
     const deletedV = getDeletedIds('Visitors');
     const deletedE = getDeletedIds('Equipment');
+
     if (dataV.rows) {
       const visitors = dataV.rows
         .map(r => ({
@@ -3364,13 +3488,30 @@ setInterval(async () => {
           createdAt: r[34] || r[11],
         }))
         .filter(v => v.id && !deletedV.includes(v.id));
-      DB.setVisitors(visitors);
+      // Jangan timpa kalau hasil fetch tiba-tiba jauh lebih sedikit dari data lokal —
+      // ini indikasi sheet belum sync sempurna atau fetch parsial/gagal.
+      const currentV = DB.visitors();
+      if (visitors.length > 0 || currentV.length === 0) {
+        if (visitors.length >= currentV.length - 2) {
+          DB.setVisitors(visitors);
+        } else {
+          console.warn('Skip update visitors: data dari Sheets lebih sedikit dari lokal, kemungkinan belum sync.');
+        }
+      }
     }
+
     if (dataE.rows) {
       const equipment = dataE.rows
-        .map(r => ({ id: r[0], name: r[1], serial: r[2], owner: r[3], gatePass: r[4], condition: r[5], notes: r[6], status: (r[7] || '').trim(), dateIn: r[8], dateOut: r[9] || null }))
+        .map(r => ({ id: r[0], name: r[1], serial: r[2], owner: r[3], gatePass: r[4], condition: r[5], status: (r[6] || '').trim(), notes: r[7], dateIn: r[8], dateOut: r[9] || null }))
         .filter(e => e.id && !deletedE.includes(e.id));
-      DB.setEquipment(equipment);
+      const currentE = DB.equipment();
+      if (equipment.length > 0 || currentE.length === 0) {
+        if (equipment.length >= currentE.length - 2) {
+          DB.setEquipment(equipment);
+        } else {
+          console.warn('Skip update equipment: data dari Sheets lebih sedikit dari lokal, kemungkinan belum sync.');
+        }
+      }
     }
     renderPage(currentPage);
   } catch(e) {
@@ -3386,6 +3527,20 @@ addAudit('LOGIN', 'SYSTEM', 'Prasad Seeds P2 — Security Officer — login');
 function openContractorCheckoutModal(id) {
   const v = DB.visitors().find(x => x.id === id);
   if (!v) return;
+
+  // Gabungkan equipment dari check-in (v.equipList) dengan equipment di sheet Equipment
+  // yang terkait visitor ini — baik via visitorId maupun kecocokan nama/company owner —
+  // dan hanya yang masih berstatus Inside, supaya tidak duplikat dengan yang sudah Outside.
+  const linkedFromEquipMenu = getLinkedEquipment(v).filter(e => e.status === 'Inside' || e.status === 'Pending Approval');
+  const namesAlreadyInCheckin = new Set((v.equipList || []).map(eq => (eq.nama || '').trim().toLowerCase()));
+
+  const combinedEquipList = [
+    ...(v.equipList || []).map(eq => ({ nama: eq.nama, qty: eq.qty, fromMenu: false })),
+    ...linkedFromEquipMenu
+      .filter(eq => !namesAlreadyInCheckin.has((eq.name || '').trim().toLowerCase()))
+      .map(eq => ({ nama: eq.name, qty: eq.qty || '1', fromMenu: true, equipId: eq.id })),
+  ];
+  v.equipList = combinedEquipList;
 
   // Buat modal jika belum ada
   let modal = document.getElementById('modal-contractor-checkout');
@@ -3437,7 +3592,7 @@ function openContractorCheckoutModal(id) {
           <input type="checkbox" id="equip-cb-${i}" onchange="updateContractorCheckoutBtn('${id}', ${v.equipList.length})"
             style="width:18px;height:18px;accent-color:var(--green);cursor:pointer;flex-shrink:0">
           <div style="flex:1">
-            <div style="font-weight:600;font-size:13.5px">${eq.nama}</div>
+            <div style="font-weight:600;font-size:13.5px">${eq.nama} ${eq.fromMenu ? '<span class="pill pill-pending" style="margin-left:4px">+ Menu Equipment</span>' : ''}</div>
             <div style="font-size:11px;color:var(--text3);margin-top:2px">Qty: <strong>${eq.qty}</strong></div>
           </div>
           <i class="ti ti-circle-check" id="equip-icon-${i}" style="font-size:20px;color:var(--border);transition:color .14s"></i>
@@ -3508,7 +3663,25 @@ async function confirmContractorCheckout(id) {
   v.status = 'Checked Out';
   v.checkOut = now();
   DB.setVisitors(visitors);
-  addAudit('CHECK_OUT', 'CONTRACTOR', `${v.name} — semua equipment terverifikasi — durasi: ${fmtDuration(v.checkIn, v.checkOut)}`);
+
+  // Tandai semua equipment yang terkait contractor ini (via visitorId ATAU kecocokan
+  // nama/company owner) sebagai Outside juga, karena sudah diverifikasi keluar bersamaan.
+  const equipment = DB.equipment();
+  const linkedIds = new Set(getLinkedEquipment(v).map(e => e.id));
+  let linkedOutCount = 0;
+  equipment.forEach(e => {
+    if (linkedIds.has(e.id) && (e.status === 'Inside' || e.status === 'Pending Approval')) {
+      e.status = 'Outside';
+      e.dateOut = v.checkOut;
+      // Tautkan permanen sekarang supaya konsisten ke depannya
+      if (!e.visitorId) e.visitorId = v.id;
+      linkedOutCount++;
+    }
+  });
+  DB.setEquipment(equipment);
+  markLocalWrite();
+
+  addAudit('CHECK_OUT', 'CONTRACTOR', `${v.name} — semua equipment terverifikasi (${v.equipList.length} item, termasuk ${linkedOutCount} dari menu Equipment) — durasi: ${fmtDuration(v.checkIn, v.checkOut)}`);
   toast(v.name + ' berhasil check out (equipment verified)', 'success');
   checkAlerts();
   renderPage(currentPage);
@@ -3519,6 +3692,10 @@ async function confirmContractorCheckout(id) {
     durasi: fmtDuration(v.checkIn, v.checkOut),
     equipVerified: true,
     user: document.getElementById('sb-uname').textContent,
+  });
+  // Kirim juga update status equipment yang ikut ter-checkout
+  equipment.filter(e => e.visitorId === id && e.dateOut === v.checkOut).forEach(e => {
+    sendToGAS('EQUIPMENT_OUT', { id: e.id, dateOut: e.dateOut, user: document.getElementById('sb-uname').textContent });
   });
   sendLogToGAS('CHECK_OUT', 'CONTRACTOR', `${v.name} — equipment verified — ${fmtDuration(v.checkIn, v.checkOut)}`);
 }
