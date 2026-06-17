@@ -2639,9 +2639,16 @@ function submitCheckinTyped(type) {
 
 
 async function doCheckout(id) {
-  if (!confirm('Konfirmasi check out visitor ini?')) return;
   const visitors = DB.visitors();
   const v = visitors.find(x => x.id === id);
+
+  // Jika contractor dan punya equipList, tampilkan popup checklist
+  if (v && v.visitorType === 'Contractor' && v.equipList && v.equipList.length > 0) {
+    openContractorCheckoutModal(id);
+    return;
+  }
+
+  if (!confirm('Konfirmasi check out visitor ini?')) return;
   if (!v) return;
   v.status = 'Checked Out';
   v.checkOut = now();
@@ -3372,6 +3379,150 @@ setInterval(async () => {
   }
 }, 10000);
 addAudit('LOGIN', 'SYSTEM', 'Prasad Seeds P2 — Security Officer — login');
+
+// ══════════════════════════════════════════
+//  CONTRACTOR CHECKOUT MODAL
+// ══════════════════════════════════════════
+function openContractorCheckoutModal(id) {
+  const v = DB.visitors().find(x => x.id === id);
+  if (!v) return;
+
+  // Buat modal jika belum ada
+  let modal = document.getElementById('modal-contractor-checkout');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.className = 'modal-bg';
+    modal.id = 'modal-contractor-checkout';
+    modal.innerHTML = `
+      <div class="modal" style="max-width:520px">
+        <div class="modal-title">
+          <span><i class="ti ti-package" style="color:var(--amber);margin-right:8px"></i>Pemeriksaan Equipment — Checkout Contractor</span>
+          <button class="modal-close" onclick="closeModal('modal-contractor-checkout')"><i class="ti ti-x"></i></button>
+        </div>
+        <div id="contractor-checkout-content"></div>
+        <div class="form-actions" id="contractor-checkout-actions"></div>
+      </div>
+    `;
+    modal.addEventListener('click', function(e) {
+      if (e.target === this) this.classList.remove('open');
+    });
+    document.body.appendChild(modal);
+  }
+
+  const content = document.getElementById('contractor-checkout-content');
+  const actions = document.getElementById('contractor-checkout-actions');
+
+  content.innerHTML = `
+    <div style="padding:12px 14px;background:var(--amber-light);border-radius:var(--radius-sm);margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
+      <i class="ti ti-alert-triangle" style="color:var(--amber);font-size:18px;flex-shrink:0;margin-top:1px"></i>
+      <div>
+        <div style="font-weight:600;font-size:13px;color:var(--amber-text)">Periksa semua equipment sebelum checkout</div>
+        <div style="font-size:12px;color:var(--amber-text);margin-top:2px">Centang setiap item yang sudah diperiksa dan dikonfirmasi dibawa keluar oleh contractor.</div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:14px">
+      <div style="font-weight:600;font-size:14px">${v.name}</div>
+      <div style="font-size:12px;color:var(--text3)">${v.company} · Area: ${v.area || '—'} · ${v.personil || '—'} personil</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:2px">SPK: ${v.spk || '—'}</div>
+    </div>
+
+    <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">
+      Daftar Equipment <span id="equip-check-counter" style="color:var(--blue)">0/${v.equipList.length}</span>
+    </div>
+
+    <div id="equip-checklist" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+      ${v.equipList.map((eq, i) => `
+        <label id="equip-row-${i}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all .14s;-webkit-tap-highlight-color:transparent">
+          <input type="checkbox" id="equip-cb-${i}" onchange="updateContractorCheckoutBtn('${id}', ${v.equipList.length})"
+            style="width:18px;height:18px;accent-color:var(--green);cursor:pointer;flex-shrink:0">
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:13.5px">${eq.nama}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">Qty: <strong>${eq.qty}</strong></div>
+          </div>
+          <i class="ti ti-circle-check" id="equip-icon-${i}" style="font-size:20px;color:var(--border);transition:color .14s"></i>
+        </label>
+      `).join('')}
+    </div>
+
+    <div style="padding:10px 12px;background:var(--gray-light);border-radius:var(--radius-sm);font-size:12px;color:var(--text3)">
+      <i class="ti ti-info-circle" style="margin-right:4px"></i>
+      Tombol <strong>Checkout</strong> akan aktif setelah semua equipment dicentang.
+    </div>
+  `;
+
+  actions.innerHTML = `
+    <button class="btn" onclick="closeModal('modal-contractor-checkout')">Batal</button>
+    <button class="btn btn-success" id="btn-contractor-checkout-confirm" onclick="confirmContractorCheckout('${id}')"
+      disabled style="opacity:.4;cursor:not-allowed">
+      <i class="ti ti-logout"></i> Checkout Contractor
+    </button>
+  `;
+
+  openModal('modal-contractor-checkout');
+}
+
+function updateContractorCheckoutBtn(id, total) {
+  const v = DB.visitors().find(x => x.id === id);
+  if (!v) return;
+
+  let checked = 0;
+  for (let i = 0; i < total; i++) {
+    const cb = document.getElementById('equip-cb-' + i);
+    const row = document.getElementById('equip-row-' + i);
+    const icon = document.getElementById('equip-icon-' + i);
+    if (cb && cb.checked) {
+      checked++;
+      if (row) row.style.borderColor = 'var(--green)';
+      if (row) row.style.background = 'var(--green-light)';
+      if (icon) icon.style.color = 'var(--green)';
+    } else {
+      if (row) row.style.borderColor = 'var(--border)';
+      if (row) row.style.background = '';
+      if (icon) icon.style.color = 'var(--border)';
+    }
+  }
+
+  const counter = document.getElementById('equip-check-counter');
+  if (counter) counter.textContent = checked + '/' + total;
+
+  const btn = document.getElementById('btn-contractor-checkout-confirm');
+  if (btn) {
+    if (checked === total) {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+    } else {
+      btn.disabled = true;
+      btn.style.opacity = '.4';
+      btn.style.cursor = 'not-allowed';
+    }
+  }
+}
+
+async function confirmContractorCheckout(id) {
+  closeModal('modal-contractor-checkout');
+  const visitors = DB.visitors();
+  const v = visitors.find(x => x.id === id);
+  if (!v) return;
+  v.status = 'Checked Out';
+  v.checkOut = now();
+  DB.setVisitors(visitors);
+  addAudit('CHECK_OUT', 'CONTRACTOR', `${v.name} — semua equipment terverifikasi — durasi: ${fmtDuration(v.checkIn, v.checkOut)}`);
+  toast(v.name + ' berhasil check out (equipment verified)', 'success');
+  checkAlerts();
+  renderPage(currentPage);
+
+  sendToGAS('CHECKOUT_VISITOR', {
+    id: id,
+    checkOutTime: v.checkOut,
+    durasi: fmtDuration(v.checkIn, v.checkOut),
+    equipVerified: true,
+    user: document.getElementById('sb-uname').textContent,
+  });
+  sendLogToGAS('CHECK_OUT', 'CONTRACTOR', `${v.name} — equipment verified — ${fmtDuration(v.checkIn, v.checkOut)}`);
+}
+
 </script>
 </body>
 </html>
