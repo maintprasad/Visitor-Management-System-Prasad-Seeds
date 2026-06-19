@@ -858,7 +858,7 @@ textarea { resize: vertical; min-height: 72px; }
       <div class="card" style="padding:0">
         <div class="table-wrap">
           <table>
-            <thead><tr><th>#</th><th>Equipment</th><th>Serial No.</th><th>Owner</th><th>Gate Pass</th><th>Condition</th><th>Status</th><th>Date In</th><th>Actions</th></tr></thead>
+            <thead><tr><th>#</th><th>Equipment</th><th>Serial No.</th><th>Owner</th><th>Visitor ID</th><th>Gate Pass</th><th>Condition</th><th>Status</th><th>Date In</th><th>Actions</th></tr></thead>
             <tbody id="equipment-table"></tbody>
           </table>
         </div>
@@ -1918,7 +1918,7 @@ function renderDashboard() {
         <td>
           <div class="flex-gap8">
             <button class="btn btn-sm" onclick="openDetail('${v.id}')"><i class="ti ti-eye"></i></button>
-            ${v.status !== 'Checked Out' ? `<button class="btn btn-sm btn-success" onclick="doCheckout('${v.id}')"><i class="ti ti-logout"></i> Out</button>` : ''}
+            ${v.status !== 'Checked Out' ? `<button class="btn btn-sm btn-success" onclick="doCheckout('${v.id}')"><i class="ti ti-logout"></i> Out</button>` : `<button class="btn btn-sm btn-primary" onclick="reCheckIn('${v.id}')" title="Re-check In"><i class="ti ti-rotate-clockwise"></i></button>`}
           </div>
         </td>
       </tr>
@@ -2021,6 +2021,7 @@ function renderVisitorTable() {
                 : ''}
                ${v.status !== 'Checked Out' ? `<button class="btn btn-sm btn-success" onclick="doCheckout('${v.id}')"><i class="ti ti-logout"></i></button>` : ''}`
           }
+          ${v.status === 'Checked Out' ? `<button class="btn btn-sm btn-primary" onclick="reCheckIn('${v.id}')" title="Re-check In (lanjutkan timer)"><i class="ti ti-rotate-clockwise"></i></button>` : ''}
           <button class="btn btn-sm btn-danger" onclick="deleteVisitor('${v.id}')"><i class="ti ti-trash"></i></button>
         </div>
       </td>
@@ -2228,7 +2229,15 @@ function renderEquipmentTable() {
       <td class="mono">${i+1}</td>
       <td><div class="td-main">${e.name}</div><div class="td-sub">${e.notes || ''}</div></td>
       <td class="mono">${e.serial || '—'}</td>
-      <td>${e.owner}${linkedVisitor ? `<div class="td-sub"><span class="pill pill-waiting"><i class="ti ti-hard-hat" style="font-size:10px"></i> ${linkedVisitor.name}</span></div>` : ''}</td>
+      <td>
+        <div class="td-main">${e.owner}</div>
+        ${linkedVisitor ? `<div class="td-sub"><span class="pill pill-waiting"><i class="ti ti-hard-hat" style="font-size:10px"></i> ${linkedVisitor.name}</span></div>` : ''}
+      </td>
+      <td>
+        ${linkedVisitor
+          ? `<div class="mono" style="font-size:11px">${linkedVisitor.id}</div><div class="td-sub">${typePill(linkedVisitor.visitorType)}</div>`
+          : `<span style="color:var(--text3);font-size:12px">—</span>`}
+      </td>
       <td class="mono">${e.gatePass}</td>
       <td><span class="pill ${e.condition === 'Good / Baik' ? 'pill-good' : 'pill-waiting'}">${e.condition}</span></td>
       <td>${statusPill(e.status)}</td>
@@ -2664,26 +2673,28 @@ function submitCheckinTyped(type) {
   visitors.unshift(base);
   DB.setVisitors(visitors);
 
-  // Jika Contractor membawa equipment saat check-in, daftarkan otomatis
-  // ke menu Equipment dan tautkan via visitorId, agar bisa dicek silang saat checkout.
-  if (type === 'Contractor' && base.equipList && base.equipList.length > 0) {
+  // Auto-register equipment ke menu Equipment untuk SEMUA tipe visitor
+  // Pastikan base.equipList sudah final sebelum register
+  const equipToRegister = (base.equipList || []).filter(item => item && item.nama && item.nama.trim());
+  if (equipToRegister.length > 0) {
     const equipment = DB.equipment();
-    base.equipList.forEach(item => {
+    equipToRegister.forEach(item => {
       equipment.unshift({
         id: genId('EQ'),
         name: item.nama,
         serial: '',
         owner: base.name,
+        ownerCompany: base.company || '',
         visitorId: base.id,
-        visitorType: 'Contractor',
+        visitorType: type,
         qty: item.qty || '1',
         gatePass: genGatePass(),
         condition: 'Good / Baik',
         status: 'Inside',
-        notes: 'Auto-generated dari check-in Contractor',
+        notes: `Auto-generated dari check-in ${type}`,
         dateIn: base.checkIn,
         dateOut: null,
-        source: 'CONTRACTOR_CHECKIN',
+        source: type.toUpperCase().replace(' ','_') + '_CHECKIN',
       });
     });
     DB.setEquipment(equipment);
@@ -2899,6 +2910,136 @@ function openDetail(id) {
   const content = document.getElementById('modal-detail-content');
   const actions = document.getElementById('modal-detail-actions');
 
+  // Auto-register equipList ke DB.equipment() kalau belum ada
+  // Ini handle kasus data lama atau data yang gagal register saat check-in
+  if ((v.equipList || []).length > 0 && (v.status === 'Inside' || v.status === 'Overstay')) {
+    const equipment = DB.equipment();
+    let changed = false;
+    v.equipList.forEach(item => {
+      if (!item || !item.nama) return;
+      const nameLower = item.nama.trim().toLowerCase();
+      const alreadyExists = equipment.find(e =>
+        e.visitorId === v.id &&
+        (e.name || '').trim().toLowerCase() === nameLower
+      );
+      if (!alreadyExists) {
+        equipment.unshift({
+          id: genId('EQ'),
+          name: item.nama,
+          serial: '',
+          owner: v.name,
+          ownerCompany: v.company || '',
+          visitorId: v.id,
+          visitorType: v.visitorType,
+          qty: item.qty || '1',
+          gatePass: genGatePass(),
+          condition: 'Good / Baik',
+          status: 'Inside',
+          notes: 'Auto-registered dari detail visitor',
+          dateIn: v.checkIn,
+          dateOut: null,
+          source: 'AUTO_REGISTER',
+        });
+        changed = true;
+      }
+    });
+    if (changed) {
+      DB.setEquipment(equipment);
+      markLocalWrite();
+    }
+  }
+
+  const linkedEq = getLinkedEquipment(v);
+  const formList = (v.equipList || []).filter(item => {
+    const nameLower = (item.nama || '').trim().toLowerCase();
+    return !linkedEq.find(e => (e.name || '').trim().toLowerCase() === nameLower);
+  });
+  const hasEquip = linkedEq.length > 0 || formList.length > 0;
+
+  let equipHTML = `
+    <div style="margin-bottom:16px">
+      <label style="font-size:12px;font-weight:700;color:var(--text2);display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">
+        <i class="ti ti-package" style="font-size:13px;margin-right:4px"></i>
+        Equipment Dibawa
+        <span class="pill pill-pending" style="margin-left:6px">${linkedEq.length + formList.length} item</span>
+      </label>`;
+
+  if (!hasEquip) {
+    equipHTML += `
+      <div style="padding:16px;text-align:center;background:var(--bg);border-radius:var(--radius-sm);border:1.5px dashed var(--border)">
+        <i class="ti ti-package-off" style="font-size:24px;color:var(--border);display:block;margin-bottom:6px"></i>
+        <span style="font-size:12px;color:var(--text3)">Tidak ada equipment yang dibawa</span>
+      </div>`;
+  } else {
+    equipHTML += `<div style="display:flex;flex-direction:column;gap:6px">`;
+    linkedEq.forEach(e => {
+      const borderColor = e.status === 'Outside' ? 'var(--border)' : 'var(--green)';
+      const bgIcon = e.status === 'Outside' ? 'var(--gray-light)' : 'var(--green-light)';
+      const colorIcon = e.status === 'Outside' ? 'var(--gray)' : 'var(--green)';
+      const qtyStr = e.qty && e.qty !== '1' ? ' &middot; Qty: <strong>' + e.qty + '</strong>' : '';
+      equipHTML += `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:var(--radius-sm);border:1.5px solid ${borderColor}">
+          <div style="width:32px;height:32px;border-radius:8px;background:${bgIcon};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <i class="ti ti-tool" style="font-size:15px;color:${colorIcon}"></i>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:13px">${e.name}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:1px">
+              Gate Pass: <span class="mono">${e.gatePass || '—'}</span>${qtyStr}
+            </div>
+            <div style="font-size:11px;color:var(--text3)">
+              Pemilik: <strong>${e.owner || v.name}</strong>
+              <span class="mono" style="color:var(--blue);margin-left:4px">${v.id}</span>
+            </div>
+          </div>
+          <div style="flex-shrink:0">${statusPill(e.status)}</div>
+        </div>`;
+    });
+    formList.forEach(item => {
+      equipHTML += `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--amber-light);border-radius:var(--radius-sm);border:1.5px solid var(--amber)">
+          <div style="width:32px;height:32px;border-radius:8px;background:rgba(217,119,6,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <i class="ti ti-tool" style="font-size:15px;color:var(--amber)"></i>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:13px">${item.nama}</div>
+            <div style="font-size:11px;color:var(--amber-text);margin-top:1px">
+              Qty: <strong>${item.qty || '1'}</strong> &middot; Diinput via form (belum terdaftar di Equipment)
+            </div>
+            <div style="font-size:11px;color:var(--amber-text)">
+              Pemilik: <strong>${v.name}</strong>
+              <span class="mono" style="color:var(--blue);margin-left:4px">${v.id}</span>
+            </div>
+          </div>
+          <span class="pill pill-waiting">Pending Sync</span>
+        </div>`;
+    });
+    equipHTML += `</div>`;
+  }
+  equipHTML += `</div>`;
+
+  const initials = v.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  const badgeHTML = `
+    <div style="margin-top:8px">
+      <label style="font-size:12px;font-weight:500;color:var(--text2);display:block;margin-bottom:8px">Visitor Badge Preview</label>
+      <div class="badge-card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+          <div class="sb-avatar" style="width:44px;height:44px;font-size:16px">${initials}</div>
+          <div>
+            <div class="bc-name">${v.name}</div>
+            <div class="bc-company">${v.company || '—'}</div>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,.07);border-radius:6px;padding:10px;font-size:12px;color:rgba(255,255,255,.7)">
+          <div>🏢 Host: ${v.host} — ${v.dept || '—'}</div>
+          <div style="margin-top:4px">📋 ${v.purpose}</div>
+          <div style="margin-top:4px">🕐 Masuk: ${fmtDateTime(v.checkIn)}</div>
+        </div>
+        <div class="bc-status" style="margin-top:10px">${v.status}</div>
+        <div class="bc-detail mono">ID: ${v.id}</div>
+      </div>
+    </div>`;
+
   content.innerHTML = `
     <div class="form-grid" style="margin-bottom:16px">
       <div class="form-group">
@@ -2915,7 +3056,7 @@ function openDetail(id) {
       </div>
       <div class="form-group">
         <label>Company</label>
-        <div>${v.company}</div>
+        <div>${v.company || '—'}</div>
       </div>
       <div class="form-group">
         <label>Phone</label>
@@ -2931,7 +3072,7 @@ function openDetail(id) {
       </div>
       <div class="form-group">
         <label>Host / PIC</label>
-        <div>${v.host}<span style="color:var(--text3)"> · ${v.dept}</span></div>
+        <div>${v.host}<span style="color:var(--text3)"> · ${v.dept || '—'}</span></div>
       </div>
       <div class="form-group">
         <label>Check-in Time</label>
@@ -2950,53 +3091,15 @@ function openDetail(id) {
         <div>${v.notes || '—'}</div>
       </div>
     </div>
-    ${(() => {
-      const linkedEq = getLinkedEquipment(v);
-      if (linkedEq.length === 0) return '';
-      return `
-        <div style="margin-bottom:16px">
-          <label style="font-size:12px;font-weight:500;color:var(--text2);display:block;margin-bottom:8px">
-            Equipment Dibawa <span class="pill pill-pending">${linkedEq.length} item</span>
-          </label>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            ${linkedEq.map(e => `
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border)">
-                <div>
-                  <div style="font-weight:600;font-size:13px">${e.name}</div>
-                  <div style="font-size:11px;color:var(--text3)">${e.gatePass || '—'}</div>
-                </div>
-                ${statusPill(e.status)}
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `;
-    })()}
-    <!-- Visitor Badge Preview -->
-    <div style="margin-top:8px">
-      <label style="font-size:12px;font-weight:500;color:var(--text2);display:block;margin-bottom:8px">Visitor Badge Preview</label>
-      <div class="badge-card">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-          <div class="sb-avatar" style="width:44px;height:44px;font-size:16px">${v.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
-          <div>
-            <div class="bc-name">${v.name}</div>
-            <div class="bc-company">${v.company}</div>
-          </div>
-        </div>
-        <div style="background:rgba(255,255,255,.07);border-radius:6px;padding:10px;font-size:12px;color:rgba(255,255,255,.7)">
-          <div>🏢 Host: ${v.host} — ${v.dept}</div>
-          <div style="margin-top:4px">📋 ${v.purpose}</div>
-          <div style="margin-top:4px">🕐 Masuk: ${fmtDateTime(v.checkIn)}</div>
-        </div>
-        <div class="bc-status" style="margin-top:10px">${v.status}</div>
-        <div class="bc-detail mono">ID: ${v.id}</div>
-      </div>
-    </div>
+    ${equipHTML}
+    ${badgeHTML}
   `;
 
   actions.innerHTML = `
     <button class="btn" onclick="closeModal('modal-detail')">Tutup</button>
-    ${v.status !== 'Checked Out' ? `<button class="btn btn-success" onclick="doCheckout('${v.id}'); closeModal('modal-detail')"><i class="ti ti-logout"></i> Check Out</button>` : ''}
+    ${v.status !== 'Checked Out'
+      ? `<button class="btn btn-success" onclick="doCheckout('${v.id}');closeModal('modal-detail')"><i class="ti ti-logout"></i> Check Out</button>`
+      : ''}
     <button class="btn btn-primary" onclick="printBadge()"><i class="ti ti-printer"></i> Print Badge</button>
   `;
 
@@ -3519,6 +3622,40 @@ setInterval(async () => {
     console.warn('Auto-refresh gagal:', e);
   }
 }, 10000);
+function reCheckIn(id) {
+  const visitors = DB.visitors();
+  const v = visitors.find(x => x.id === id);
+  if (!v) return;
+  if (!confirm(`Re-check In "${v.name}"?\nTimer akan dilanjutkan dari waktu checkout terakhir (${fmtDateTime(v.checkOut || v.checkIn)})`)) return;
+
+  // Simpan waktu checkout lama sebagai base checkIn baru, agar durasi akumulatif
+  const prevCheckOut = v.checkOut || v.checkIn;
+  v.status = 'Inside';
+  v.checkIn = prevCheckOut;  // lanjutkan dari titik terakhir
+  v.checkOut = null;
+
+  // Jika punya equipment yang sudah di-Outside karena checkout, kembalikan ke Inside
+  const equipment = DB.equipment();
+  let reactivatedCount = 0;
+  equipment.forEach(e => {
+    if (e.visitorId === id && (e.status === 'Outside')) {
+      e.status = 'Inside';
+      e.dateOut = null;
+      reactivatedCount++;
+    }
+  });
+  DB.setEquipment(equipment);
+
+  DB.setVisitors(visitors);
+  markLocalWrite();
+  addAudit('RE_CHECKIN', 'VISITOR', `${v.name} — dikembalikan ke Inside${reactivatedCount > 0 ? `, ${reactivatedCount} equipment direaktivasi` : ''}`);
+  sendLogToGAS('RE_CHECKIN', 'VISITOR', `${v.name} — re-check in dari ${fmtDateTime(prevCheckOut)}`);
+  sendToGAS('UPDATE_STATUS', { sheet: 'Visitors', id, status: 'Inside', user: document.getElementById('sb-uname').textContent });
+  toast(`${v.name} kembali Inside — timer dilanjutkan`, 'success');
+  checkAlerts();
+  renderPage(currentPage);
+}
+
 addAudit('LOGIN', 'SYSTEM', 'Prasad Seeds P2 — Security Officer — login');
 
 // ══════════════════════════════════════════
