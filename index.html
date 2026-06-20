@@ -943,6 +943,7 @@ textarea { resize: vertical; min-height: 72px; }
           <i class="ti ti-search"></i>
           <input type="text" class="search-input" id="absen-search" placeholder="Cari nama PT atau supervisi..." oninput="renderAbsenTable()">
         </div>
+        <button class="btn" onclick="backfillAbsenFromContractorNotes()" title="Sisir data check-in Contractor lama yang Notes-nya berformat daftar bernomor"><i class="ti ti-refresh-dot"></i> Scan Data Lama</button>
         <button class="btn btn-primary" onclick="openModal('modal-absen-kontraktor')"><i class="ti ti-plus"></i> Tambah Absen</button>
       </div>
       <div class="card" style="padding:0">
@@ -1656,6 +1657,27 @@ const DB = {
 
 function genId(prefix) {
   return prefix + '-' + Math.random().toString(36).substr(2,8).toUpperCase();
+}
+
+// Parse daftar nama pekerja dari teks Catatan dengan format bernomor, contoh:
+// "1. Hadi\n2. Faizi\n3) Thoriq\n4 Boy sandi\n1.man.\n2.samsul."
+// Hanya baris yang DIAWALI angka yang dianggap nama pekerja — baris lain
+// (kalimat bebas tanpa angka di depan) otomatis diabaikan.
+function parseCrewNamesFromNotes(notes) {
+  if (!notes) return [];
+  const lines = notes.split('\n');
+  const names = [];
+  lines.forEach(line => {
+    const trimmed = line.trim();
+    const match = trimmed.match(/^(\d{1,3})[\.\)]?\s*(.+)$/);
+    if (match) {
+      let name = match[2].trim();
+      name = name.replace(/^[\.\-\)]+/, '').trim();   // bersihkan sisa karakter di depan
+      name = name.replace(/\.+$/, '').trim();          // bersihkan titik di akhir
+      if (name.length >= 2) names.push(name);
+    }
+  });
+  return names;
 }
 
 // Cari semua equipment (dari sheet Equipment) yang terkait dengan seorang visitor,
@@ -2636,6 +2658,55 @@ function exportReport(type) {
 // ══════════════════════════════════════════
 //  EXPORT EXCEL — Multi Sheet (Guest, Contractor, Driver) — Styled
 // ══════════════════════════════════════════
+function normalizeStr(s) {
+  return (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ').replace(/^pt\.?\s*/, '').replace(/^cv\.?\s*/, '');
+}
+
+function getContractorPersonilInfo(v) {
+  const safePekerjaCount = (d) => Array.isArray(d.pekerja) ? d.pekerja.length : 0;
+  const safePekerjaNames = (d) => Array.isArray(d.pekerja) ? d.pekerja : [];
+
+  // Prioritas 1: match langsung via visitorId — ini dipakai untuk absen yang
+  // dibuat OTOMATIS dari hasil parsing Catatan saat check-in. Paling akurat
+  // karena memang khusus dibuat untuk visitor ini, tidak akan ketuker PT lain.
+  const directMatches = DB.absen().filter(d => d && d.visitorId === v.id);
+  if (directMatches.length > 0) {
+    const names = [];
+    let count = 0;
+    directMatches.forEach(d => { count += safePekerjaCount(d); names.push(...safePekerjaNames(d)); });
+    return { count, names: names.join(', ') || '—' };
+  }
+
+  // Prioritas 2: fuzzy match via nama PT (Company) atau nama Supervisi/PJ —
+  // untuk absen yang diinput manual lewat menu "Absen Kontraktor" terpisah.
+  const companyN = normalizeStr(v.company);
+  const nameN = normalizeStr(v.name);
+  const hostN = normalizeStr(v.host);
+
+  const fuzzyMatch = (a, b) => {
+    if (!a || !b) return false;
+    return a === b || a.includes(b) || b.includes(a);
+  };
+
+  const matches = DB.absen().filter(d => {
+    if (!d) return false;
+    const ptN = normalizeStr(d.pt);
+    const spvN = normalizeStr(d.spv);
+    return fuzzyMatch(companyN, ptN) || fuzzyMatch(nameN, spvN) || fuzzyMatch(hostN, spvN);
+  });
+
+  if (matches.length > 0) {
+    const names = [];
+    let count = 0;
+    matches.forEach(d => { count += safePekerjaCount(d); names.push(...safePekerjaNames(d)); });
+    return { count, names: names.join(', ') || '—' };
+  }
+
+  // Fallback: belum ada data Absen Kontraktor yang cocok sama sekali — pakai
+  // jumlah personil yang diisi manual saat form check-in.
+  return { count: v.personil || '—', names: '—' };
+}
+
 function buildEquipSummary(v) {
   // Ambil semua equipment yang terkait visitor ini (form input + menu Equipment)
   const linked = getLinkedEquipment(v);
@@ -2782,108 +2853,119 @@ async function exportExcelAllTypes() {
   if (typeof ExcelJS === 'undefined') { toast('Library Excel gagal dimuat, cek koneksi internet', 'error'); return; }
   toast('Membuat file Excel...', 'info');
 
-  const visitors = DB.visitors();
-  const wb = new ExcelJS.Workbook();
-  wb.creator = 'Visitor System Management';
-  wb.created = new Date();
+  try {
+    const visitors = DB.visitors();
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'Visitor System Management';
+    wb.created = new Date();
 
-  // ── SHEET: Guest ──
-  const guestRows = visitors.filter(v => v.visitorType === 'Guest').map(v => ({
-    ID: v.id,
-    Nama: v.name,
-    Company: v.company || '—',
-    Host: v.host || '—',
-    CheckIn: fmtDateTime(v.checkIn),
-    CheckOut: v.checkOut ? fmtDateTime(v.checkOut) : '—',
-    Duration: fmtDuration(v.checkIn, v.checkOut),
-    Status: v.status,
-  }));
-  addStyledSheet(wb, 'Guest', [
-    { header: 'ID', key: 'ID', width: 16 },
-    { header: 'Nama Visitor', key: 'Nama', width: 24 },
-    { header: 'Company', key: 'Company', width: 22 },
-    { header: 'Host', key: 'Host', width: 18 },
-    { header: 'Check In', key: 'CheckIn', width: 20 },
-    { header: 'Check Out', key: 'CheckOut', width: 20 },
-    { header: 'Duration', key: 'Duration', width: 13 },
-    { header: 'Status', key: 'Status', width: 17 },
-  ], guestRows);
-
-  // ── SHEET: Contractor ──
-  const contractorRows = visitors.filter(v => v.visitorType === 'Contractor').map(v => {
-    const equip = buildEquipSummary(v);
-    const slaBase = v.slaStart || v.checkIn;
-    return {
+    // ── SHEET: Guest ──
+    const guestRows = visitors.filter(v => v.visitorType === 'Guest').map(v => ({
       ID: v.id,
       Nama: v.name,
       Company: v.company || '—',
       Host: v.host || '—',
-      Equipment: equip.all,
-      EquipInside: equip.inside,
-      EquipOutside: equip.outside,
       CheckIn: fmtDateTime(v.checkIn),
       CheckOut: v.checkOut ? fmtDateTime(v.checkOut) : '—',
-      Duration: fmtDuration(slaBase, v.checkOut),
+      Duration: fmtDuration(v.checkIn, v.checkOut),
       Status: v.status,
-    };
-  });
-  addStyledSheet(wb, 'Contractor', [
-    { header: 'ID', key: 'ID', width: 16 },
-    { header: 'Nama Contractor', key: 'Nama', width: 24 },
-    { header: 'Company', key: 'Company', width: 22 },
-    { header: 'Host', key: 'Host', width: 18 },
-    { header: 'Equipment / Peralatan', key: 'Equipment', width: 32 },
-    { header: 'Peralatan Inside\n(Belum Checkout)', key: 'EquipInside', width: 28 },
-    { header: 'Peralatan Outside\n(Sudah Checkout)', key: 'EquipOutside', width: 28 },
-    { header: 'Check In', key: 'CheckIn', width: 20 },
-    { header: 'Check Out', key: 'CheckOut', width: 20 },
-    { header: 'Duration', key: 'Duration', width: 13 },
-    { header: 'Status', key: 'Status', width: 17 },
-  ], contractorRows);
+    }));
+    addStyledSheet(wb, 'Guest', [
+      { header: 'ID', key: 'ID', width: 16 },
+      { header: 'Nama Visitor', key: 'Nama', width: 24 },
+      { header: 'Company', key: 'Company', width: 22 },
+      { header: 'Host', key: 'Host', width: 18 },
+      { header: 'Check In', key: 'CheckIn', width: 20 },
+      { header: 'Check Out', key: 'CheckOut', width: 20 },
+      { header: 'Duration', key: 'Duration', width: 13 },
+      { header: 'Status', key: 'Status', width: 17 },
+    ], guestRows);
 
-  // ── SHEET: Driver ──
-  const driverRows = visitors.filter(v => v.visitorType === 'Driver').map(v => ({
-    ID: v.id,
-    Nama: v.name,
-    Company: v.company || '—',
-    Host: v.host || '—',
-    Plat: v.plate || '—',
-    Vehicle: v.vehicle || '—',
-    Cargo: v.cargo || '—',
-    Tujuan: v.purpose || '—',
-    Notes: v.notes || '—',
-    CheckIn: fmtDateTime(v.checkIn),
-    CheckOut: v.checkOut ? fmtDateTime(v.checkOut) : '—',
-    Duration: fmtDuration(v.checkIn, v.checkOut),
-    Status: v.status,
-  }));
-  addStyledSheet(wb, 'Driver', [
-    { header: 'ID', key: 'ID', width: 16 },
-    { header: 'Nama Driver', key: 'Nama', width: 24 },
-    { header: 'Company', key: 'Company', width: 22 },
-    { header: 'Host', key: 'Host', width: 18 },
-    { header: 'No Polisi Kendaraan', key: 'Plat', width: 18 },
-    { header: 'Jenis Kendaraan', key: 'Vehicle', width: 17 },
-    { header: 'Muatan', key: 'Cargo', width: 22 },
-    { header: 'Tujuan', key: 'Tujuan', width: 18 },
-    { header: 'Catatan', key: 'Notes', width: 26 },
-    { header: 'Check In', key: 'CheckIn', width: 20 },
-    { header: 'Check Out', key: 'CheckOut', width: 20 },
-    { header: 'Duration', key: 'Duration', width: 13 },
-    { header: 'Status', key: 'Status', width: 17 },
-  ], driverRows);
+    // ── SHEET: Contractor ──
+    const contractorRows = visitors.filter(v => v.visitorType === 'Contractor').map(v => {
+      const equip = buildEquipSummary(v);
+      const personilInfo = getContractorPersonilInfo(v);
+      const slaBase = v.slaStart || v.checkIn;
+      return {
+        ID: v.id,
+        Nama: v.name,
+        Company: v.company || '—',
+        Host: v.host || '—',
+        JumlahPersonil: personilInfo.count,
+        NamaPekerja: personilInfo.names,
+        Equipment: equip.all,
+        EquipInside: equip.inside,
+        EquipOutside: equip.outside,
+        CheckIn: fmtDateTime(v.checkIn),
+        CheckOut: v.checkOut ? fmtDateTime(v.checkOut) : '—',
+        Duration: fmtDuration(slaBase, v.checkOut),
+        Status: v.status,
+      };
+    });
+    addStyledSheet(wb, 'Contractor', [
+      { header: 'ID', key: 'ID', width: 16 },
+      { header: 'Nama Contractor', key: 'Nama', width: 24 },
+      { header: 'Company', key: 'Company', width: 22 },
+      { header: 'Host', key: 'Host', width: 18 },
+      { header: 'Jumlah Personil', key: 'JumlahPersonil', width: 15 },
+      { header: 'Nama Pekerja\n(dari Absen Kontraktor)', key: 'NamaPekerja', width: 32 },
+      { header: 'Equipment / Peralatan', key: 'Equipment', width: 32 },
+      { header: 'Peralatan Inside\n(Belum Checkout)', key: 'EquipInside', width: 28 },
+      { header: 'Peralatan Outside\n(Sudah Checkout)', key: 'EquipOutside', width: 28 },
+      { header: 'Check In', key: 'CheckIn', width: 20 },
+      { header: 'Check Out', key: 'CheckOut', width: 20 },
+      { header: 'Duration', key: 'Duration', width: 13 },
+      { header: 'Status', key: 'Status', width: 17 },
+    ], contractorRows);
 
-  const filename = 'visitor-report-' + new Date().toISOString().slice(0,10) + '.xlsx';
-  const buffer = await wb.xlsx.writeBuffer();
-  const blob = new Blob([buffer], { type: 'application/octet-stream' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+    // ── SHEET: Driver ──
+    const driverRows = visitors.filter(v => v.visitorType === 'Driver').map(v => ({
+      ID: v.id,
+      Nama: v.name,
+      Company: v.company || '—',
+      Host: v.host || '—',
+      Plat: v.plate || '—',
+      Vehicle: v.vehicle || '—',
+      Cargo: v.cargo || '—',
+      Tujuan: v.purpose || '—',
+      Notes: v.notes || '—',
+      CheckIn: fmtDateTime(v.checkIn),
+      CheckOut: v.checkOut ? fmtDateTime(v.checkOut) : '—',
+      Duration: fmtDuration(v.checkIn, v.checkOut),
+      Status: v.status,
+    }));
+    addStyledSheet(wb, 'Driver', [
+      { header: 'ID', key: 'ID', width: 16 },
+      { header: 'Nama Driver', key: 'Nama', width: 24 },
+      { header: 'Company', key: 'Company', width: 22 },
+      { header: 'Host', key: 'Host', width: 18 },
+      { header: 'No Polisi Kendaraan', key: 'Plat', width: 18 },
+      { header: 'Jenis Kendaraan', key: 'Vehicle', width: 17 },
+      { header: 'Muatan', key: 'Cargo', width: 22 },
+      { header: 'Tujuan', key: 'Tujuan', width: 18 },
+      { header: 'Catatan', key: 'Notes', width: 26 },
+      { header: 'Check In', key: 'CheckIn', width: 20 },
+      { header: 'Check Out', key: 'CheckOut', width: 20 },
+      { header: 'Duration', key: 'Duration', width: 13 },
+      { header: 'Status', key: 'Status', width: 17 },
+    ], driverRows);
 
-  addAudit('EXPORT', 'REPORT', `Excel report (styled) — Guest:${guestRows.length}, Contractor:${contractorRows.length}, Driver:${driverRows.length}`);
-  sendLogToGAS('EXPORT', 'REPORT', `Excel report (3 sheet, styled) — Guest:${guestRows.length}, Contractor:${contractorRows.length}, Driver:${driverRows.length}`);
-  toast('Excel report berhasil di-export (3 sheet, dengan styling)', 'success');
+    const filename = 'visitor-report-' + new Date().toISOString().slice(0,10) + '.xlsx';
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    addAudit('EXPORT', 'REPORT', `Excel report (styled) — Guest:${guestRows.length}, Contractor:${contractorRows.length}, Driver:${driverRows.length}`);
+    sendLogToGAS('EXPORT', 'REPORT', `Excel report (3 sheet, styled) — Guest:${guestRows.length}, Contractor:${contractorRows.length}, Driver:${driverRows.length}`);
+    toast('Excel report berhasil di-export (3 sheet, dengan styling)', 'success');
+
+  } catch (err) {
+    console.error('Export Excel error:', err);
+    toast('Gagal export Excel: ' + err.message, 'error');
+  }
 }
 
 // ══════════════════════════════════════════
@@ -3014,6 +3096,40 @@ function submitCheckinTyped(type) {
       });
     });
     DB.setEquipment(equipment);
+  }
+
+  // Auto-create Absen Kontraktor kalau Catatan berisi daftar nama bernomor
+  // (minimal 2 baris terdeteksi). Jumlah Personil otomatis disesuaikan
+  // dengan jumlah nama yang benar-benar terdeteksi (lebih akurat daripada
+  // angka manual), dan absen langsung tertaut via visitorId.
+  if (type === 'Contractor') {
+    const crewNames = parseCrewNamesFromNotes(base.notes);
+    if (crewNames.length >= 2) {
+      base.personil = String(crewNames.length);
+
+      const absenAlat = (base.equipList || [])
+        .filter(item => item && item.nama && item.nama.trim())
+        .map(item => ({ nama: item.nama, qty: item.qty || '1' }));
+
+      const absenData = {
+        id: genId('ABK'),
+        pt: base.company || '',
+        spv: base.host || '',
+        pekerja: crewNames,
+        alat: absenAlat,
+        tanggal: base.checkIn,
+        user: base.user,
+        visitorId: base.id,
+        source: 'AUTO_FROM_CHECKIN',
+      };
+      const absenList = DB.absen();
+      absenList.unshift(absenData);
+      DB.setAbsen(absenList);
+
+      addAudit('CREATE', 'ABSEN_KONTRAKTOR', `[Auto dari Check-in] ${absenData.pt} — ${absenData.spv} — ${crewNames.length} pekerja terdeteksi`);
+      sendToGAS('ADD_ABSEN_KONTRAKTOR', absenData);
+      sendLogToGAS('CREATE', 'ABSEN_KONTRAKTOR', `[Auto] ${absenData.pt} — ${crewNames.length} pekerja dari catatan check-in`);
+    }
   }
 
   markLocalWrite();
@@ -3859,6 +3975,53 @@ function openAbsenDetail(id) {
     </div>
   `;
   openModal('modal-absen-detail');
+}
+
+// Sisir data Contractor yang SUDAH ADA (check-in lama, termasuk yang sudah
+// kebawa dari Google Sheets) dan otomatis buat record Absen Kontraktor untuk
+// yang Notes-nya berformat daftar bernomor tapi belum punya record absen.
+function backfillAbsenFromContractorNotes() {
+  const visitors = DB.visitors().filter(v => v.visitorType === 'Contractor');
+  const existingAbsen = DB.absen();
+  const existingVisitorIds = new Set(existingAbsen.filter(d => d.visitorId).map(d => d.visitorId));
+  let createdCount = 0;
+  let skippedNoFormat = 0;
+
+  visitors.forEach(v => {
+    if (existingVisitorIds.has(v.id)) return; // sudah pernah dibuatkan absennya
+
+    const crewNames = parseCrewNamesFromNotes(v.notes);
+    if (crewNames.length < 2) { skippedNoFormat++; return; }
+
+    const absenAlat = (v.equipList || [])
+      .filter(item => item && item.nama && item.nama.trim())
+      .map(item => ({ nama: item.nama, qty: item.qty || '1' }));
+
+    const absenData = {
+      id: genId('ABK'),
+      pt: v.company || '',
+      spv: v.host || '',
+      pekerja: crewNames,
+      alat: absenAlat,
+      tanggal: v.checkIn,
+      user: v.user || document.getElementById('sb-uname').textContent,
+      visitorId: v.id,
+      source: 'AUTO_BACKFILL',
+    };
+    existingAbsen.unshift(absenData);
+    createdCount++;
+    sendToGAS('ADD_ABSEN_KONTRAKTOR', absenData);
+  });
+
+  if (createdCount > 0) {
+    DB.setAbsen(existingAbsen);
+    addAudit('CREATE', 'ABSEN_KONTRAKTOR', `[Backfill] ${createdCount} record dibuat otomatis dari Notes check-in lama`);
+    sendLogToGAS('CREATE', 'ABSEN_KONTRAKTOR', `[Backfill] ${createdCount} record dari catatan check-in lama`);
+    toast(`${createdCount} data absen berhasil dibuat dari catatan check-in lama`, 'success');
+    renderAbsenTable();
+  } else {
+    toast(`Tidak ada data baru — ${skippedNoFormat} contractor Notes-nya tidak berformat daftar bernomor, sisanya sudah punya record absen`, 'info');
+  }
 }
 
 function deleteAbsen(id) {
