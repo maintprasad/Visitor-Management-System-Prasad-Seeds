@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.6.0/dist/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root {
   --navy: #0f1829;
@@ -712,6 +713,7 @@ textarea { resize: vertical; min-height: 72px; }
       <div class="topbar-sub" id="page-sub">Live monitoring · Real-time</div>
     </div>
     <div class="topbar-actions" id="topbar-actions">
+      <span id="sync-badge" class="pill pill-overstay" style="display:none;cursor:pointer" onclick="retryPendingSync()" title="Klik untuk coba sync ulang sekarang"></span>
       <button class="btn btn-primary" onclick="openModal('modal-select-type')"><i class="ti ti-user-plus"></i> Check In Visitor</button>
     </div>
   </div>
@@ -1012,6 +1014,7 @@ textarea { resize: vertical; min-height: 72px; }
             <div class="flex-gap8">
               <input type="date" id="report-date" style="width:160px" onchange="renderReportDaily()">
               <button class="btn btn-sm" onclick="exportReport('daily')"><i class="ti ti-download"></i> Export CSV</button>
+              <button class="btn btn-sm btn-primary" onclick="exportExcelAllTypes()"><i class="ti ti-file-spreadsheet"></i> Export Excel</button>
             </div>
           </div>
           <div class="table-wrap"><table>
@@ -1543,25 +1546,85 @@ textarea { resize: vertical; min-height: 72px; }
 // ══════════════════════════════════════════
  
 // Ganti dengan URL Web App hasil Deploy di Google Apps Script
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbykfv9j6MHlGZK2chWzIE97KL38cVC7JoEdIl8dJXaIQXHusmVSkq40iAVM0ZPW3awq/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzRxsTBcpy2TTO9GwvuZrXPFX2i5v2If1XdoiNTl6juRaYPLHx2x9IDmbk6iyQ5g5a6/exec';
  
-async function sendToGAS(action, data) {
+// Antrian retry untuk request yang gagal — supaya data tidak hilang diam-diam
+// saat koneksi sempat putus atau GAS lagi sibuk (misal banyak checkin bersamaan).
+const PENDING_SYNC_KEY = 'vsm_pending_sync';
+function getPendingSync() { return JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || '[]'); }
+function setPendingSync(arr) { localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(arr)); }
+
+function updateSyncIndicator() {
+  const pending = getPendingSync();
+  const badge = document.getElementById('sync-badge');
+  if (!badge) return;
+  if (pending.length === 0) {
+    badge.style.display = 'none';
+  } else {
+    badge.style.display = '';
+    badge.textContent = pending.length + ' belum tersinkron';
+  }
+}
+
+async function sendToGAS(action, data, _isRetry) {
   if (!GAS_URL) return { ok: false };
+
+  // IMPORTANT: TANPA mode 'no-cors' — supaya kita bisa baca sukses/gagalnya beneran.
+  // GAS web app yang di-deploy "Execute as: Me" + "Who has access: Anyone"
+  // akan otomatis bisa diakses cross-origin tanpa header CORS tambahan,
+  // SELAMA tidak dipanggil dengan mode no-cors di sisi fetch.
   try {
-    // Gunakan no-cors — GAS tidak support CORS dari browser langsung.
-    // Response akan selalu opaque, jadi kita anggap ok kalau tidak throw.
-    await fetch(GAS_URL, {
+    const res = await fetch(GAS_URL, {
       method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain = hindari CORS preflight
       body: JSON.stringify({ action, data }),
     });
-    return { ok: true }; // no-cors selalu resolve tanpa throw = sukses
+    const json = await res.json();
+    if (!json.ok) {
+      console.warn('[GAS] Server menolak:', action, json.error);
+      if (!_isRetry) queuePendingSync(action, data);
+      return { ok: false, error: json.error };
+    }
+    return { ok: true, result: json.result };
   } catch (err) {
-    console.warn('[GAS] Gagal kirim:', action, err.message);
+    console.warn('[GAS] Gagal kirim (network):', action, err.message);
+    if (!_isRetry) queuePendingSync(action, data);
     return { ok: false, error: err.message };
   }
 }
+
+function queuePendingSync(action, data) {
+  const pending = getPendingSync();
+  pending.push({ action, data, queuedAt: Date.now(), attempts: 0 });
+  setPendingSync(pending);
+  updateSyncIndicator();
+  toast('Gagal sync ke server, akan dicoba ulang otomatis', 'error');
+}
+
+// Coba kirim ulang semua item yang pending, tiap 15 detik.
+// Maksimal 5 percobaan per item, setelah itu dianggap gagal permanen
+// (tetap disimpan supaya kelihatan di indicator, user bisa retry manual).
+async function retryPendingSync() {
+  const pending = getPendingSync();
+  if (pending.length === 0) return;
+
+  const stillPending = [];
+  for (const item of pending) {
+    if (item.attempts >= 5) { stillPending.push(item); continue; }
+    const res = await sendToGAS(item.action, item.data, true);
+    if (!res.ok) {
+      item.attempts++;
+      stillPending.push(item);
+    }
+    // kalau sukses, tidak dimasukkan lagi ke stillPending = otomatis terhapus dari antrian
+  }
+  setPendingSync(stillPending);
+  updateSyncIndicator();
+  if (stillPending.length === 0 && pending.length > 0) {
+    toast('Semua data berhasil tersinkron ke server', 'success');
+  }
+}
+setInterval(retryPendingSync, 15000);
 
 // Helper: kirim log ke sheet Logs secara otomatis
 function sendLogToGAS(action, entity, detail) {
@@ -2571,6 +2634,259 @@ function exportReport(type) {
 }
 
 // ══════════════════════════════════════════
+//  EXPORT EXCEL — Multi Sheet (Guest, Contractor, Driver) — Styled
+// ══════════════════════════════════════════
+function buildEquipSummary(v) {
+  // Ambil semua equipment yang terkait visitor ini (form input + menu Equipment)
+  const linked = getLinkedEquipment(v);
+  const fromForm = (v.equipList || []).filter(item => {
+    const nameLower = (item.nama || '').trim().toLowerCase();
+    return !linked.find(e => (e.name || '').trim().toLowerCase() === nameLower);
+  });
+
+  const allNames = [];
+  const insideNames = [];
+  const outsideNames = [];
+
+  linked.forEach(e => {
+    const label = e.qty && e.qty !== '1' ? `${e.name} (${e.qty})` : e.name;
+    allNames.push(label);
+    if (e.status === 'Outside') outsideNames.push(label);
+    else insideNames.push(label);
+  });
+  fromForm.forEach(item => {
+    const label = item.qty && item.qty !== '1' ? `${item.nama} (${item.qty})` : item.nama;
+    allNames.push(label);
+    insideNames.push(label); // belum tercatat di Equipment = anggap masih inside/belum checkout
+  });
+
+  return {
+    all: allNames.join(', ') || '—',
+    inside: insideNames.join(', ') || '—',
+    outside: outsideNames.join(', ') || '—',
+  };
+}
+
+// Warna tema per sheet (ARGB, harus 8 digit: AA + RRGGBB)
+const EXCEL_THEME = {
+  Guest:      { header: 'FF2563EB', headerText: 'FFFFFFFF', accent: 'FFDBEAFE' }, // biru
+  Contractor: { header: 'FFD97706', headerText: 'FFFFFFFF', accent: 'FFFEF3C7' }, // amber
+  Driver:     { header: 'FF16A34A', headerText: 'FFFFFFFF', accent: 'FFDCFCE7' }, // hijau
+};
+
+const STATUS_COLOR = {
+  'Inside':           'FFDCFCE7',
+  'Overstay':         'FFFEE2E2',
+  'Waiting Approval': 'FFFEF3C7',
+  'Checked Out':      'FFF3F4F6',
+  'Pending Approval': 'FFDBEAFE',
+};
+
+function styleHeaderRow(row, theme) {
+  row.eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: theme.headerText }, size: 11 };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: theme.header } };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+      bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+      left: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+      right: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+    };
+  });
+  row.height = 28;
+}
+
+function styleDataRow(row, isEven, statusValue, rowHeight) {
+  row.eachCell((cell) => {
+    cell.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+      bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+      left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+      right: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+    };
+    if (isEven) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+  });
+  // Warnai cell Status sesuai nilainya (selalu kolom terakhir)
+  const statusCell = row.getCell(row.cellCount);
+  const color = STATUS_COLOR[statusValue];
+  if (color) {
+    statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
+    statusCell.font = { bold: true, size: 10 };
+    statusCell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  }
+  row.height = rowHeight;
+}
+
+// Hitung perkiraan tinggi row berdasarkan teks terpanjang di tiap kolom.
+// Excel ~ 1 baris teks butuh tinggi sekitar 15pt, dan tiap kolom punya lebar (wch)
+// yang menampung sekitar (width - 2) karakter per baris sebelum wrap.
+function estimateRowHeight(rowData, columns) {
+  const LINE_HEIGHT = 15;     // tinggi per baris teks (pt)
+  const MIN_HEIGHT = 22;
+  const MAX_HEIGHT = 250;     // batas atas biar gak kebablasan kalau ada teks super panjang
+  let maxLines = 1;
+
+  columns.forEach(col => {
+    const raw = rowData[col.key];
+    if (raw === undefined || raw === null) return;
+    const text = String(raw);
+    if (!text || text === '—') return;
+
+    const usableWidth = Math.max(col.width - 2, 6); // karakter efektif per baris
+    // Hitung baris dari newline manual + wrap otomatis per segmen
+    const segments = text.split('\n');
+    let lines = 0;
+    segments.forEach(seg => {
+      lines += Math.max(1, Math.ceil(seg.length / usableWidth));
+    });
+    if (lines > maxLines) maxLines = lines;
+  });
+
+  return Math.min(Math.max(maxLines * LINE_HEIGHT, MIN_HEIGHT), MAX_HEIGHT);
+}
+
+function addStyledSheet(wb, sheetName, columns, rows) {
+  const theme = EXCEL_THEME[sheetName] || EXCEL_THEME.Guest;
+  const ws = wb.addWorksheet(sheetName, {
+    views: [{ state: 'frozen', ySplit: 1 }],
+  });
+
+  ws.columns = columns.map(c => ({ header: c.header, key: c.key, width: c.width }));
+
+  const headerRow = ws.getRow(1);
+  styleHeaderRow(headerRow, theme);
+
+  if (rows.length === 0) {
+    const emptyRow = ws.addRow({ [columns[0].key]: 'Tidak ada data' });
+    ws.mergeCells(2, 1, 2, columns.length);
+    emptyRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+    emptyRow.getCell(1).font = { italic: true, color: { argb: 'FF9CA3AF' } };
+    emptyRow.height = 26;
+  } else {
+    rows.forEach((r, i) => {
+      const row = ws.addRow(r);
+      const rowHeight = estimateRowHeight(r, columns);
+      styleDataRow(row, i % 2 === 1, r.Status, rowHeight);
+    });
+  }
+
+  // Auto-filter di header
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: columns.length } };
+
+  return ws;
+}
+
+async function exportExcelAllTypes() {
+  if (typeof ExcelJS === 'undefined') { toast('Library Excel gagal dimuat, cek koneksi internet', 'error'); return; }
+  toast('Membuat file Excel...', 'info');
+
+  const visitors = DB.visitors();
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Visitor System Management';
+  wb.created = new Date();
+
+  // ── SHEET: Guest ──
+  const guestRows = visitors.filter(v => v.visitorType === 'Guest').map(v => ({
+    ID: v.id,
+    Nama: v.name,
+    Company: v.company || '—',
+    Host: v.host || '—',
+    CheckIn: fmtDateTime(v.checkIn),
+    CheckOut: v.checkOut ? fmtDateTime(v.checkOut) : '—',
+    Duration: fmtDuration(v.checkIn, v.checkOut),
+    Status: v.status,
+  }));
+  addStyledSheet(wb, 'Guest', [
+    { header: 'ID', key: 'ID', width: 16 },
+    { header: 'Nama Visitor', key: 'Nama', width: 24 },
+    { header: 'Company', key: 'Company', width: 22 },
+    { header: 'Host', key: 'Host', width: 18 },
+    { header: 'Check In', key: 'CheckIn', width: 20 },
+    { header: 'Check Out', key: 'CheckOut', width: 20 },
+    { header: 'Duration', key: 'Duration', width: 13 },
+    { header: 'Status', key: 'Status', width: 17 },
+  ], guestRows);
+
+  // ── SHEET: Contractor ──
+  const contractorRows = visitors.filter(v => v.visitorType === 'Contractor').map(v => {
+    const equip = buildEquipSummary(v);
+    const slaBase = v.slaStart || v.checkIn;
+    return {
+      ID: v.id,
+      Nama: v.name,
+      Company: v.company || '—',
+      Host: v.host || '—',
+      Equipment: equip.all,
+      EquipInside: equip.inside,
+      EquipOutside: equip.outside,
+      CheckIn: fmtDateTime(v.checkIn),
+      CheckOut: v.checkOut ? fmtDateTime(v.checkOut) : '—',
+      Duration: fmtDuration(slaBase, v.checkOut),
+      Status: v.status,
+    };
+  });
+  addStyledSheet(wb, 'Contractor', [
+    { header: 'ID', key: 'ID', width: 16 },
+    { header: 'Nama Contractor', key: 'Nama', width: 24 },
+    { header: 'Company', key: 'Company', width: 22 },
+    { header: 'Host', key: 'Host', width: 18 },
+    { header: 'Equipment / Peralatan', key: 'Equipment', width: 32 },
+    { header: 'Peralatan Inside\n(Belum Checkout)', key: 'EquipInside', width: 28 },
+    { header: 'Peralatan Outside\n(Sudah Checkout)', key: 'EquipOutside', width: 28 },
+    { header: 'Check In', key: 'CheckIn', width: 20 },
+    { header: 'Check Out', key: 'CheckOut', width: 20 },
+    { header: 'Duration', key: 'Duration', width: 13 },
+    { header: 'Status', key: 'Status', width: 17 },
+  ], contractorRows);
+
+  // ── SHEET: Driver ──
+  const driverRows = visitors.filter(v => v.visitorType === 'Driver').map(v => ({
+    ID: v.id,
+    Nama: v.name,
+    Company: v.company || '—',
+    Host: v.host || '—',
+    Plat: v.plate || '—',
+    Vehicle: v.vehicle || '—',
+    Cargo: v.cargo || '—',
+    Tujuan: v.purpose || '—',
+    Notes: v.notes || '—',
+    CheckIn: fmtDateTime(v.checkIn),
+    CheckOut: v.checkOut ? fmtDateTime(v.checkOut) : '—',
+    Duration: fmtDuration(v.checkIn, v.checkOut),
+    Status: v.status,
+  }));
+  addStyledSheet(wb, 'Driver', [
+    { header: 'ID', key: 'ID', width: 16 },
+    { header: 'Nama Driver', key: 'Nama', width: 24 },
+    { header: 'Company', key: 'Company', width: 22 },
+    { header: 'Host', key: 'Host', width: 18 },
+    { header: 'No Polisi Kendaraan', key: 'Plat', width: 18 },
+    { header: 'Jenis Kendaraan', key: 'Vehicle', width: 17 },
+    { header: 'Muatan', key: 'Cargo', width: 22 },
+    { header: 'Tujuan', key: 'Tujuan', width: 18 },
+    { header: 'Catatan', key: 'Notes', width: 26 },
+    { header: 'Check In', key: 'CheckIn', width: 20 },
+    { header: 'Check Out', key: 'CheckOut', width: 20 },
+    { header: 'Duration', key: 'Duration', width: 13 },
+    { header: 'Status', key: 'Status', width: 17 },
+  ], driverRows);
+
+  const filename = 'visitor-report-' + new Date().toISOString().slice(0,10) + '.xlsx';
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  addAudit('EXPORT', 'REPORT', `Excel report (styled) — Guest:${guestRows.length}, Contractor:${contractorRows.length}, Driver:${driverRows.length}`);
+  sendLogToGAS('EXPORT', 'REPORT', `Excel report (3 sheet, styled) — Guest:${guestRows.length}, Contractor:${contractorRows.length}, Driver:${driverRows.length}`);
+  toast('Excel report berhasil di-export (3 sheet, dengan styling)', 'success');
+}
+
+// ══════════════════════════════════════════
 //  AUDIT TRAIL
 // ══════════════════════════════════════════
 function renderAudit() {
@@ -3222,6 +3538,13 @@ async function loadFromGAS() {
   if (!GAS_URL) { seedIfEmpty(); renderDashboard(); return; }
   toast('Memuat data dari Google Sheets...', 'info');
   try {
+    const [verV, verE] = await Promise.all([
+      fetchGAS({ action: 'GET_SHEET_VERSION', sheet: 'Visitors' }),
+      fetchGAS({ action: 'GET_SHEET_VERSION', sheet: 'Equipment' }),
+    ]);
+    lastFingerprintV = verV.fingerprint;
+    lastFingerprintE = verE.fingerprint;
+
     const [dataV, dataE] = await Promise.all([
       fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'Visitors' }),
       fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'Equipment' }),
@@ -3562,66 +3885,93 @@ loadFromGAS();
 let lastLocalWriteAt = 0;
 function markLocalWrite() { lastLocalWriteAt = Date.now(); }
 
-// Auto-refresh dari GAS setiap 10 detik
-setInterval(async () => {
+// ══════════════════════════════════════════
+//  SMART POLLING — cek fingerprint dulu sebelum fetch data penuh,
+//  + stagger antar device supaya tidak nembak GAS bersamaan.
+// ══════════════════════════════════════════
+let lastFingerprintV = null;
+let lastFingerprintE = null;
+
+async function fullRefreshFromGAS() {
+  const [dataV, dataE] = await Promise.all([
+    fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'Visitors' }),
+    fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'Equipment' }),
+  ]);
+  const deletedV = getDeletedIds('Visitors');
+  const deletedE = getDeletedIds('Equipment');
+
+  if (dataV.rows) {
+    const visitors = dataV.rows
+      .map(r => ({
+        id: r[0], visitorType: (r[1] || 'Guest'), name: r[2], company: r[3],
+        phone: r[4], identity: r[5], purpose: r[6], host: r[7], dept: r[8],
+        notes: r[9], status: (r[10] || '').trim(), checkIn: r[11], checkOut: r[12] || null,
+        area: r[14], personil: r[16], spk: r[17], startDate: r[18], endDate: r[19],
+        equipList: r[20] ? r[20].split(';').map(s => { const p = s.trim().match(/^(.+)\((\d+)\)$/); return p ? { nama: p[1].trim(), qty: p[2] } : { nama: s.trim(), qty: '1' }; }) : [],
+        slaStart: r[21] || null, plate: r[23], vehicle: r[24], cargo: r[25],
+        driverApproved: r[26] === 'TRUE', approvedAt: r[27] || null, gatePassOut: r[28] || null,
+        nik: r[29], jabatan: r[30], auditType: r[31], scope: r[32], suratTugas: r[33],
+        createdAt: r[34] || r[11],
+      }))
+      .filter(v => v.id && !deletedV.includes(v.id));
+    const currentV = DB.visitors();
+    if (visitors.length > 0 || currentV.length === 0) {
+      if (visitors.length >= currentV.length - 2) {
+        DB.setVisitors(visitors);
+      } else {
+        console.warn('Skip update visitors: data dari Sheets lebih sedikit dari lokal, kemungkinan belum sync.');
+      }
+    }
+  }
+
+  if (dataE.rows) {
+    const equipment = dataE.rows
+      .map(r => ({ id: r[0], name: r[1], serial: r[2], owner: r[3], gatePass: r[4], condition: r[5], status: (r[6] || '').trim(), notes: r[7], dateIn: r[8], dateOut: r[9] || null }))
+      .filter(e => e.id && !deletedE.includes(e.id));
+    const currentE = DB.equipment();
+    if (equipment.length > 0 || currentE.length === 0) {
+      if (equipment.length >= currentE.length - 2) {
+        DB.setEquipment(equipment);
+      } else {
+        console.warn('Skip update equipment: data dari Sheets lebih sedikit dari lokal, kemungkinan belum sync.');
+      }
+    }
+  }
+  renderPage(currentPage);
+}
+
+async function smartPoll() {
   if (!GAS_URL) return;
   // Beri jeda 15 detik setelah perubahan lokal terakhir, agar Google Sheets
   // punya waktu untuk benar-benar menyimpan baris baru sebelum kita fetch ulang.
   if (Date.now() - lastLocalWriteAt < 15000) return;
 
   try {
-    const [dataV, dataE] = await Promise.all([
-      fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'Visitors' }),
-      fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'Equipment' }),
+    // Cek fingerprint dulu — request ini jauh lebih ringan daripada fetch semua data.
+    const [verV, verE] = await Promise.all([
+      fetchGAS({ action: 'GET_SHEET_VERSION', sheet: 'Visitors' }),
+      fetchGAS({ action: 'GET_SHEET_VERSION', sheet: 'Equipment' }),
     ]);
-    const deletedV = getDeletedIds('Visitors');
-    const deletedE = getDeletedIds('Equipment');
 
-    if (dataV.rows) {
-      const visitors = dataV.rows
-        .map(r => ({
-          id: r[0], visitorType: (r[1] || 'Guest'), name: r[2], company: r[3],
-          phone: r[4], identity: r[5], purpose: r[6], host: r[7], dept: r[8],
-          notes: r[9], status: (r[10] || '').trim(), checkIn: r[11], checkOut: r[12] || null,
-          area: r[14], personil: r[16], spk: r[17], startDate: r[18], endDate: r[19],
-          equipList: r[20] ? r[20].split(';').map(s => { const p = s.trim().match(/^(.+)\((\d+)\)$/); return p ? { nama: p[1].trim(), qty: p[2] } : { nama: s.trim(), qty: '1' }; }) : [],
-          slaStart: r[21] || null, plate: r[23], vehicle: r[24], cargo: r[25],
-          driverApproved: r[26] === 'TRUE', approvedAt: r[27] || null, gatePassOut: r[28] || null,
-          nik: r[29], jabatan: r[30], auditType: r[31], scope: r[32], suratTugas: r[33],
-          createdAt: r[34] || r[11],
-        }))
-        .filter(v => v.id && !deletedV.includes(v.id));
-      // Jangan timpa kalau hasil fetch tiba-tiba jauh lebih sedikit dari data lokal —
-      // ini indikasi sheet belum sync sempurna atau fetch parsial/gagal.
-      const currentV = DB.visitors();
-      if (visitors.length > 0 || currentV.length === 0) {
-        if (visitors.length >= currentV.length - 2) {
-          DB.setVisitors(visitors);
-        } else {
-          console.warn('Skip update visitors: data dari Sheets lebih sedikit dari lokal, kemungkinan belum sync.');
-        }
-      }
-    }
+    const changed = (verV.fingerprint !== lastFingerprintV) || (verE.fingerprint !== lastFingerprintE);
+    if (!changed) return; // tidak ada perubahan, skip fetch data penuh
 
-    if (dataE.rows) {
-      const equipment = dataE.rows
-        .map(r => ({ id: r[0], name: r[1], serial: r[2], owner: r[3], gatePass: r[4], condition: r[5], status: (r[6] || '').trim(), notes: r[7], dateIn: r[8], dateOut: r[9] || null }))
-        .filter(e => e.id && !deletedE.includes(e.id));
-      const currentE = DB.equipment();
-      if (equipment.length > 0 || currentE.length === 0) {
-        if (equipment.length >= currentE.length - 2) {
-          DB.setEquipment(equipment);
-        } else {
-          console.warn('Skip update equipment: data dari Sheets lebih sedikit dari lokal, kemungkinan belum sync.');
-        }
-      }
-    }
-    renderPage(currentPage);
+    lastFingerprintV = verV.fingerprint;
+    lastFingerprintE = verE.fingerprint;
+    await fullRefreshFromGAS();
   } catch(e) {
     // silent fail — jangan toast supaya tidak ganggu user
     console.warn('Auto-refresh gagal:', e);
   }
-}, 10000);
+}
+
+// Stagger: tiap device mulai polling dengan delay acak (0-4 detik) supaya
+// 15 device tidak semua nembak GAS di detik yang sama persis.
+const pollStaggerDelay = Math.floor(Math.random() * 4000);
+setTimeout(() => {
+  smartPoll();
+  setInterval(smartPoll, 10000);
+}, pollStaggerDelay);
 function reCheckIn(id) {
   const visitors = DB.visitors();
   const v = visitors.find(x => x.id === id);
@@ -3657,6 +4007,7 @@ function reCheckIn(id) {
 }
 
 addAudit('LOGIN', 'SYSTEM', 'Prasad Seeds P2 — Security Officer — login');
+updateSyncIndicator();
 
 // ══════════════════════════════════════════
 //  CONTRACTOR CHECKOUT MODAL
