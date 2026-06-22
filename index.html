@@ -6,6 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1829">
+<link rel="icon" href="data:,">
 <title>Visitor System Management</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -603,6 +604,7 @@ textarea { resize: vertical; min-height: 72px; }
 
   /* Stat grid: 2-col on mobile */
   .stat-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px; }
+  .stat-grid[style*="repeat(5"] { grid-template-columns: repeat(2, 1fr) !important; }
   .stat-val { font-size: 26px; }
   .stat-card { padding: 12px; }
 
@@ -720,7 +722,7 @@ textarea { resize: vertical; min-height: 72px; }
       <span id="sync-badge" class="pill pill-overstay" style="display:none;cursor:pointer" onclick="retryPendingSync()" title="Klik untuk coba sync ulang sekarang"></span>
       <button class="btn btn-primary" onclick="openModal('modal-select-type')"><i class="ti ti-user-plus"></i> Check In Visitor</button>
     </div>
-  </div>
+</div>
 
   <!-- ══ PAGES ══ -->
   <div class="content">
@@ -825,7 +827,7 @@ textarea { resize: vertical; min-height: 72px; }
       <div class="search-wrap">
         <div class="search-input-wrap">
           <i class="ti ti-search"></i>
-          <input type="text" class="search-input" id="visitor-search" placeholder="Search by name, company, or host..." oninput="renderVisitorTable()">
+          <input type="text" class="search-input" id="visitor-search" placeholder="Search by name, company, or host..." oninput="debounce(renderVisitorTable,220)()">
         </div>
         <select id="visitor-filter-status" onchange="renderVisitorTable()" style="width:160px">
           <option value="">All Status</option>
@@ -857,7 +859,7 @@ textarea { resize: vertical; min-height: 72px; }
       <div class="search-wrap">
         <div class="search-input-wrap">
           <i class="ti ti-search"></i>
-          <input type="text" class="search-input" id="equip-search" placeholder="Search equipment..." oninput="renderEquipmentTable()">
+          <input type="text" class="search-input" id="equip-search" placeholder="Search equipment..." oninput="debounce(renderEquipmentTable,220)()">
         </div>
         <button class="btn btn-primary" onclick="populateEquipContractorLink();openModal('modal-equipment')"><i class="ti ti-plus"></i> Add Equipment</button>
       </div>
@@ -945,7 +947,7 @@ textarea { resize: vertical; min-height: 72px; }
       <div class="search-wrap">
         <div class="search-input-wrap">
           <i class="ti ti-search"></i>
-          <input type="text" class="search-input" id="absen-search" placeholder="Cari nama PT atau supervisi..." oninput="renderAbsenTable()">
+          <input type="text" class="search-input" id="absen-search" placeholder="Cari nama PT atau supervisi..." oninput="debounce(renderAbsenTable,220)()">
         </div>
         <button class="btn" onclick="backfillAbsenFromContractorNotes()" title="Sisir data check-in Contractor lama yang Notes-nya berformat daftar bernomor"><i class="ti ti-refresh-dot"></i> Scan Data Lama</button>
         <button class="btn btn-primary" onclick="openModal('modal-absen-kontraktor')"><i class="ti ti-plus"></i> Tambah Absen</button>
@@ -1186,11 +1188,14 @@ textarea { resize: vertical; min-height: 72px; }
           <option>Civil</option><option>Electric</option><option>Mechanic</option><option>HR</option>
         </select>
       </div>
-      <div class="form-group"><label>Jumlah Personil *</label>
-        <input type="number" id="con-personil" placeholder="0" min="1" max="999"
-          oninput="this.value=this.value.replace(/[^0-9]/g,'')">
-      </div>
       <div class="form-group"><label>No. SPK / PO</label><input type="text" id="con-spk" placeholder="Nomor SPK atau PO"></div>
+      <div class="form-group full">
+        <label>Daftar Nama Pekerja * <span style="font-weight:400;color:var(--text3)">(Jumlah personil otomatis terhitung)</span></label>
+        <div id="con-pekerja-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+        <button type="button" class="btn btn-sm" onclick="addConPekerjaRow()">
+          <i class="ti ti-plus"></i> Tambah Pekerja
+        </button>
+      </div>
 
       <div class="form-group"><label>Host / PIC *</label><input type="text" id="con-host" placeholder="Nama PIC internal"></div>
       <div class="form-group"><label>Department</label>
@@ -1658,6 +1663,14 @@ const DB = {
   absen: () => DB.get('absen'),
   setAbsen: (v) => DB.set('absen', v),
 };
+
+const _debounceTimers = {};
+function debounce(fn, delay) {
+  return function(...args) {
+    clearTimeout(_debounceTimers[fn.name]);
+    _debounceTimers[fn.name] = setTimeout(() => fn.apply(this, args), delay);
+  };
+}
 
 function genId(prefix) {
   return prefix + '-' + Math.random().toString(36).substr(2,8).toUpperCase();
@@ -2134,6 +2147,28 @@ function openCheckinByType() {
 }
 
 // ── EQUIPMENT ROW (Contractor) ────────────────────────────
+function addConPekerjaRow() {
+  const list = document.getElementById('con-pekerja-list');
+  const row = document.createElement('div');
+  row.className = 'equip-row';
+  row.innerHTML = `
+    <input type="text" class="con-pekerja-nama" placeholder="Nama pekerja" style="grid-column:1/-2">
+    <button type="button" class="btn-remove-equip" onclick="this.closest('.equip-row').remove();updateConPersonilCount()">
+      <i class="ti ti-x"></i>
+    </button>
+  `;
+  list.appendChild(row);
+  row.querySelector('.con-pekerja-nama').addEventListener('input', updateConPersonilCount);
+  row.querySelector('.con-pekerja-nama').focus();
+}
+
+function updateConPersonilCount() {
+  const names = [...document.querySelectorAll('#con-pekerja-list .con-pekerja-nama')]
+    .map(el => el.value.trim()).filter(Boolean);
+  const el = document.getElementById('con-personil-display');
+  if (el) el.textContent = names.length + ' orang';
+}
+
 function addEquipmentRow() {
   const list = document.getElementById('con-equipment-list');
   const row = document.createElement('div');
@@ -2560,13 +2595,20 @@ function initReports() {
   const dateEl = document.getElementById('report-date');
   if (dateEl && !dateEl.value) dateEl.value = new Date().toISOString().slice(0,10);
   const monthEl = document.getElementById('report-month');
-  if (monthEl && monthEl.children.length === 0) {
-    for (let i=0; i<6; i++) {
-      const d = new Date(); d.setMonth(d.getMonth() - i);
-      const val = d.toISOString().slice(0,7);
-      const opt = document.createElement('option'); opt.value = val;
-      opt.textContent = d.toLocaleDateString('id-ID', {month:'long', year:'numeric'});
-      monthEl.appendChild(opt);
+  if (monthEl) {
+    const currentMonth = new Date().toISOString().slice(0,7);
+    // Refresh setiap buka Reports supaya bulan selalu up-to-date
+    const firstOpt = monthEl.children[0];
+    const needsRefresh = !firstOpt || firstOpt.value !== currentMonth;
+    if (needsRefresh) {
+      monthEl.innerHTML = '';
+      for (let i=0; i<6; i++) {
+        const d = new Date(); d.setMonth(d.getMonth() - i);
+        const val = d.toISOString().slice(0,7);
+        const opt = document.createElement('option'); opt.value = val;
+        opt.textContent = d.toLocaleDateString('id-ID', {month:'long', year:'numeric'});
+        monthEl.appendChild(opt);
+      }
     }
   }
 }
@@ -2670,9 +2712,12 @@ function getContractorPersonilInfo(v) {
   const safePekerjaCount = (d) => Array.isArray(d.pekerja) ? d.pekerja.length : 0;
   const safePekerjaNames = (d) => Array.isArray(d.pekerja) ? d.pekerja : [];
 
-  // Prioritas 1: match langsung via visitorId — ini dipakai untuk absen yang
-  // dibuat OTOMATIS dari hasil parsing Catatan saat check-in. Paling akurat
-  // karena memang khusus dibuat untuk visitor ini, tidak akan ketuker PT lain.
+  // Prioritas 0: pekerjaList langsung di object visitor (paling akurat)
+  if (Array.isArray(v.pekerjaList) && v.pekerjaList.length > 0) {
+    return { count: v.pekerjaList.length, names: v.pekerjaList.join(', ') };
+  }
+
+  // Prioritas 1: match langsung via visitorId
   const directMatches = DB.absen().filter(d => d && d.visitorId === v.id);
   if (directMatches.length > 0) {
     const names = [];
@@ -3019,9 +3064,7 @@ function submitCheckinTyped(type) {
   if (!name || !host || !purpose) { toast('Lengkapi field yang wajib diisi (*)', 'error'); return; }
   if (type === 'Contractor') {
     const area = document.getElementById('con-area')?.value;
-    const personil = document.getElementById('con-personil')?.value;
     if (!area) { toast('Pilih Area Kerja', 'error'); return; }
-    if (!personil || parseInt(personil) < 1) { toast('Isi Jumlah Personil (angka)', 'error'); return; }
   }
 
   const base = {
@@ -3045,6 +3088,13 @@ function submitCheckinTyped(type) {
       const qty  = row.querySelector('.eq-qty')?.value?.trim();
       if (nama) equipRows.push({ nama, qty: qty || '1' });
     });
+
+    // Ambil nama pekerja dari form langsung
+    const pekerjaNames = [...document.querySelectorAll('#con-pekerja-list .con-pekerja-nama')]
+      .map(el => el.value.trim()).filter(Boolean);
+
+    if (pekerjaNames.length === 0) { toast('Tambahkan minimal 1 nama pekerja', 'error'); return; }
+
     const conStatus = document.getElementById('con-status').value;
     Object.assign(base, {
       company:    get('company'),
@@ -3056,13 +3106,13 @@ function submitCheckinTyped(type) {
       startDate:  get('start'),
       endDate:    get('end'),
       area:       document.getElementById('con-area').value,
-      personil:   get('personil'),
+      personil:   String(pekerjaNames.length),
+      pekerjaList: pekerjaNames,
       equipList:  equipRows,
       slaStart:   conStatus === 'Inside' ? base.checkIn : null,
     });
     base.status = conStatus;
     if (!base.area) { toast('Pilih Area Kerja', 'error'); return; }
-    if (!base.personil || parseInt(base.personil) < 1) { toast('Isi Jumlah Personil', 'error'); return; }
   } else if (type === 'Driver') {
     Object.assign(base, { company: get('company'), phone: get('phone'), identity: get('identity'), plate: get('plate'), vehicle: document.getElementById('drv-vehicle').value, cargo: get('cargo'), notes: get('notes') });
   } else if (type === 'Employee Test') {
@@ -3102,38 +3152,30 @@ function submitCheckinTyped(type) {
     DB.setEquipment(equipment);
   }
 
-  // Auto-create Absen Kontraktor kalau Catatan berisi daftar nama bernomor
-  // (minimal 2 baris terdeteksi). Jumlah Personil otomatis disesuaikan
-  // dengan jumlah nama yang benar-benar terdeteksi (lebih akurat daripada
-  // angka manual), dan absen langsung tertaut via visitorId.
-  if (type === 'Contractor') {
-    const crewNames = parseCrewNamesFromNotes(base.notes);
-    if (crewNames.length >= 2) {
-      base.personil = String(crewNames.length);
+  // Auto-create Absen Kontraktor dari pekerjaList yang diinput langsung di form
+  if (type === 'Contractor' && (base.pekerjaList || []).length > 0) {
+    const absenAlat = (base.equipList || [])
+      .filter(item => item && item.nama && item.nama.trim())
+      .map(item => ({ nama: item.nama, qty: item.qty || '1' }));
 
-      const absenAlat = (base.equipList || [])
-        .filter(item => item && item.nama && item.nama.trim())
-        .map(item => ({ nama: item.nama, qty: item.qty || '1' }));
+    const absenData = {
+      id: genId('ABK'),
+      pt: base.company || '',
+      spv: base.host || '',
+      pekerja: base.pekerjaList,
+      alat: absenAlat,
+      tanggal: base.checkIn,
+      user: base.user,
+      visitorId: base.id,
+      source: 'AUTO_FROM_CHECKIN',
+    };
+    const absenList = DB.absen();
+    absenList.unshift(absenData);
+    DB.setAbsen(absenList);
 
-      const absenData = {
-        id: genId('ABK'),
-        pt: base.company || '',
-        spv: base.host || '',
-        pekerja: crewNames,
-        alat: absenAlat,
-        tanggal: base.checkIn,
-        user: base.user,
-        visitorId: base.id,
-        source: 'AUTO_FROM_CHECKIN',
-      };
-      const absenList = DB.absen();
-      absenList.unshift(absenData);
-      DB.setAbsen(absenList);
-
-      addAudit('CREATE', 'ABSEN_KONTRAKTOR', `[Auto dari Check-in] ${absenData.pt} — ${absenData.spv} — ${crewNames.length} pekerja terdeteksi`);
-      sendToGAS('ADD_ABSEN_KONTRAKTOR', absenData);
-      sendLogToGAS('CREATE', 'ABSEN_KONTRAKTOR', `[Auto] ${absenData.pt} — ${crewNames.length} pekerja dari catatan check-in`);
-    }
+    addAudit('CREATE', 'ABSEN_KONTRAKTOR', `[Auto dari Check-in] ${absenData.pt} — ${absenData.spv} — ${base.pekerjaList.length} pekerja`);
+    sendToGAS('ADD_ABSEN_KONTRAKTOR', absenData);
+    sendLogToGAS('CREATE', 'ABSEN_KONTRAKTOR', `[Auto] ${absenData.pt} — ${base.pekerjaList.length} pekerja`);
   }
 
   markLocalWrite();
@@ -3144,6 +3186,11 @@ function submitCheckinTyped(type) {
   // reset field
   document.querySelectorAll(`#${modalId} input, #${modalId} textarea`).forEach(el => el.value = '');
   document.querySelectorAll(`#${modalId} select`).forEach(el => el.selectedIndex = 0);
+  // reset dynamic lists
+  const pekerjaListEl = document.getElementById('con-pekerja-list');
+  if (pekerjaListEl) pekerjaListEl.innerHTML = '';
+  const equipListEl = document.getElementById('con-equipment-list');
+  if (equipListEl) equipListEl.innerHTML = '';
 
   checkAlerts();
   renderPage(currentPage);
@@ -3385,12 +3432,10 @@ function openDetail(id) {
     }
   }
 
+  // Re-fetch setelah auto-register di atas selesai, supaya linkedEq sudah include item baru
   const linkedEq = getLinkedEquipment(v);
-  const formList = (v.equipList || []).filter(item => {
-    const nameLower = (item.nama || '').trim().toLowerCase();
-    return !linkedEq.find(e => (e.name || '').trim().toLowerCase() === nameLower);
-  });
-  const hasEquip = linkedEq.length > 0 || formList.length > 0;
+  const formList = []; // semua equipList sudah diregister, tidak ada yang pending sync
+  const hasEquip = linkedEq.length > 0;
 
   let equipHTML = `
     <div style="margin-bottom:16px">
@@ -3587,11 +3632,14 @@ function downloadCSV(csv, filename) {
 //  LIVE TIMERS (tick every second)
 // ══════════════════════════════════════════
 setInterval(() => {
-  document.querySelectorAll('.timer[data-checkin]').forEach(el => {
+  // Hanya tick timer yang ada di halaman aktif
+  const pageEl = document.getElementById('page-' + currentPage);
+  if (!pageEl) return;
+  pageEl.querySelectorAll('.timer[data-checkin]').forEach(el => {
     const status = el.dataset.status;
     if (status === 'Checked Out') return;
     const checkout = el.dataset.checkout;
-    if (checkout) return; // sudah checkout, jangan tick
+    if (checkout) return;
     const secs = durationSecs(el.dataset.checkin);
     el.textContent = fmtDuration(el.dataset.checkin);
     el.className = 'timer ' + (secs > 14400 ? 'danger' : secs > 10800 ? 'warn' : '');
@@ -3783,10 +3831,15 @@ const _navCore = function(page, el) {
   document.getElementById('page-sub').textContent = sub;
   currentPage = page;
   const ta = document.getElementById('topbar-actions');
-  ta.innerHTML = '';
+  const syncBadgeHTML = '<span id="sync-badge" class="pill pill-overstay" style="display:none;cursor:pointer" onclick="retryPendingSync()" title="Klik untuk coba sync ulang sekarang"></span>';
   if (page === 'emergency') {
-    ta.innerHTML = '<button class="btn btn-danger" onclick="exportEmergency()"><i class="ti ti-download"></i> Export Muster Report</button>';
+    ta.innerHTML = syncBadgeHTML + '<button class="btn btn-danger" onclick="exportEmergency()"><i class="ti ti-download"></i> Export Muster Report</button>';
+  } else if (page === 'dashboard') {
+    ta.innerHTML = syncBadgeHTML + '<button class="btn btn-primary" onclick="openModal(\'modal-select-type\')"><i class="ti ti-user-plus"></i> Check In Visitor</button>';
+  } else {
+    ta.innerHTML = syncBadgeHTML;
   }
+  updateSyncIndicator();
   renderPage(page);
   setBottomNav(page);
 };
@@ -3810,7 +3863,8 @@ window.addEventListener('popstate', function(e) {
     return;
   }
   const page = (e.state && e.state.page) ? e.state.page : 'dashboard';
-  _navCore(page, null);
+  const sbItem = document.querySelector(`.sb-item[onclick*="'${page}'"]`);
+  _navCore(page, sbItem);
 });
 
 // Set initial history state
@@ -3823,6 +3877,7 @@ history.replaceState({ page: 'dashboard' }, '', '#dashboard');
 localStorage.removeItem('vsm_visitors');
 localStorage.removeItem('vsm_equipment');
 localStorage.removeItem('vsm_alerts');
+localStorage.removeItem('vsm_absen');
 
 // ══════════════════════════════════════════
 //  ABSEN KONTRAKTOR
