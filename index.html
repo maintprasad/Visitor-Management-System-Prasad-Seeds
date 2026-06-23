@@ -1556,14 +1556,8 @@ textarea { resize: vertical; min-height: 72px; }
 // ══════════════════════════════════════════
  
 // Ganti dengan URL Web App hasil Deploy di Google Apps Script
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzRxsTBcpy2TTO9GwvuZrXPFX2i5v2If1XdoiNTl6juRaYPLHx2x9IDmbk6iyQ5g5a6/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwfEFJ6J13W_PsRJpKa9Uq8hqwdHGN07XcUnw5DI50D82NLfS22aElJ4UayijjyUGrVRw/exec';
  
-// Antrian retry untuk request yang gagal — supaya data tidak hilang diam-diam
-// saat koneksi sempat putus atau GAS lagi sibuk (misal banyak checkin bersamaan).
-const PENDING_SYNC_KEY = 'vsm_pending_sync';
-function getPendingSync() { return JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || '[]'); }
-function setPendingSync(arr) { localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(arr)); }
-
 function updateSyncIndicator() {
   const pending = getPendingSync();
   const badge = document.getElementById('sync-badge');
@@ -1605,8 +1599,13 @@ async function sendToGAS(action, data, _isRetry) {
 
 function queuePendingSync(action, data) {
   const pending = getPendingSync();
-  pending.push({ action, data, queuedAt: Date.now(), attempts: 0 });
-  setPendingSync(pending);
+  // Hindari duplikat: kalau action+data (berdasarkan id, kalau ada) sama persis sudah ada di antrian, jangan dobel
+  const dataId = data && data.id ? data.id : null;
+  const isDuplicate = dataId && pending.some(p => p.action === action && p.data && p.data.id === dataId);
+  if (!isDuplicate) {
+    pending.push({ action, data, queuedAt: Date.now(), attempts: 0 });
+    setPendingSync(pending);
+  }
   updateSyncIndicator();
   toast('Gagal sync ke server, akan dicoba ulang otomatis', 'error');
 }
@@ -1663,6 +1662,33 @@ const DB = {
   absen: () => DB.get('absen'),
   setAbsen: (v) => DB.set('absen', v),
 };
+
+// Antrian item yang gagal terkirim ke GAS, supaya bisa diretry otomatis.
+// Disimpan terpisah di key sendiri (bukan lewat DB.get/set generik) supaya
+// tidak ikut terhapus oleh proses "bersihkan localStorage lama" saat reload.
+function getPendingSync() {
+  try {
+    return JSON.parse(localStorage.getItem('vsm_pending_sync') || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+function setPendingSync(items) {
+  localStorage.setItem('vsm_pending_sync', JSON.stringify(items));
+}
+
+// Antrian item yang gagal terkirim ke GAS, supaya bisa diretry otomatis
+// (disimpan terpisah dari 'pending sync key' biasa supaya tidak ikut ke-flush oleh DB.get/set generik)
+function getPendingSync() {
+  try {
+    return JSON.parse(localStorage.getItem('vsm_pending_sync') || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+function setPendingSync(items) {
+  localStorage.setItem('vsm_pending_sync', JSON.stringify(items));
+}
 
 const _debounceTimers = {};
 function debounce(fn, delay) {
@@ -3681,7 +3707,7 @@ function fetchGAS(params) {
     const url = GAS_URL + '?' + new URLSearchParams({ ...params, callback: cbName });
     const script = document.createElement('script');
     script.src = url;
-    const timer = setTimeout(() => { cleanup(); reject(new Error('Timeout')); }, 10000);
+    const timer = setTimeout(() => { cleanup(); reject(new Error('Timeout')); }, 20000);
     window[cbName] = (data) => { cleanup(); resolve(data); };
     function cleanup() {
       clearTimeout(timer);
@@ -3769,17 +3795,24 @@ async function loadFromGAS() {
     }
 
     if (dataE.rows && dataE.rows.length > 0) {
+      // Urutan kolom sheet Equipment di GAS:
+      // ID,Nama,Serial,Owner,OwnerCompany,VisitorID,VisitorType,GatePass,Condition,Qty,Status,Notes,DateIn,DateOut,Source,User
       const equipment = dataE.rows.map(r => ({
-        id:        r[0],
-        name:      r[1],
-        serial:    r[2],
-        owner:     r[3],
-        gatePass:  r[4],
-        condition: r[5],
-        status:    r[6],
-        notes:     r[7],
-        dateIn:    r[8],
-        dateOut:   r[9] || null,
+        id:           r[0],
+        name:         r[1],
+        serial:       r[2],
+        owner:        r[3],
+        ownerCompany: r[4],
+        visitorId:    r[5] || null,
+        visitorType:  r[6] || null,
+        gatePass:     r[7],
+        condition:    r[8],
+        qty:          r[9] || '1',
+        status:       (r[10] || '').trim(),
+        notes:        r[11],
+        dateIn:       r[12],
+        dateOut:      r[13] || null,
+        source:       r[14],
       })).filter(e => e.id && e.name && !deletedE.includes(e.id));
       if (equipment.length > 0) DB.setEquipment(equipment);
     }
@@ -3873,11 +3906,14 @@ history.replaceState({ page: 'dashboard' }, '', '#dashboard');
 // ══════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════
-// Bersihkan localStorage lama setiap load, biar selalu fresh dari GAS
+// Bersihkan localStorage lama setiap load, biar selalu fresh dari GAS.
+// CATATAN: 'vsm_absen' TIDAK dihapus di sini — sheet AbsenKontraktor tidak
+// pernah di-fetch-ulang dari GAS (loadFromGAS/fullRefreshFromGAS tidak
+// menyentuhnya), jadi menghapusnya di setiap reload akan membuat data
+// Contractor Attendance hilang permanen dari UI walau datanya aman di Sheets.
 localStorage.removeItem('vsm_visitors');
 localStorage.removeItem('vsm_equipment');
 localStorage.removeItem('vsm_alerts');
-localStorage.removeItem('vsm_absen');
 
 // ══════════════════════════════════════════
 //  ABSEN KONTRAKTOR
@@ -4147,8 +4183,16 @@ async function fullRefreshFromGAS() {
   }
 
   if (dataE.rows) {
+    // Urutan kolom sheet Equipment di GAS:
+    // ID,Nama,Serial,Owner,OwnerCompany,VisitorID,VisitorType,GatePass,Condition,Qty,Status,Notes,DateIn,DateOut,Source,User
     const equipment = dataE.rows
-      .map(r => ({ id: r[0], name: r[1], serial: r[2], owner: r[3], gatePass: r[4], condition: r[5], status: (r[6] || '').trim(), notes: r[7], dateIn: r[8], dateOut: r[9] || null }))
+      .map(r => ({
+        id: r[0], name: r[1], serial: r[2], owner: r[3], ownerCompany: r[4],
+        visitorId: r[5] || null, visitorType: r[6] || null,
+        gatePass: r[7], condition: r[8], qty: r[9] || '1',
+        status: (r[10] || '').trim(), notes: r[11],
+        dateIn: r[12], dateOut: r[13] || null, source: r[14],
+      }))
       .filter(e => e.id && !deletedE.includes(e.id));
     const currentE = DB.equipment();
     if (equipment.length > 0 || currentE.length === 0) {
