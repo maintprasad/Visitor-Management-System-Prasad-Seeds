@@ -3732,16 +3732,19 @@ async function loadFromGAS() {
   if (!GAS_URL) { seedIfEmpty(); renderDashboard(); return; }
   toast('Memuat data dari Google Sheets...', 'info');
   try {
-    const [verV, verE] = await Promise.all([
+    const [verV, verE, verA] = await Promise.all([
       fetchGAS({ action: 'GET_SHEET_VERSION', sheet: 'Visitors' }),
       fetchGAS({ action: 'GET_SHEET_VERSION', sheet: 'Equipment' }),
+      fetchGAS({ action: 'GET_SHEET_VERSION', sheet: 'AbsenKontraktor' }),
     ]);
     lastFingerprintV = verV.fingerprint;
     lastFingerprintE = verE.fingerprint;
+    lastFingerprintA = verA.fingerprint;
 
-    const [dataV, dataE] = await Promise.all([
+    const [dataV, dataE, dataA] = await Promise.all([
       fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'Visitors' }),
       fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'Equipment' }),
+      fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'AbsenKontraktor' }),
     ]);
 
     const deletedV = getDeletedIds('Visitors');
@@ -3815,6 +3818,26 @@ async function loadFromGAS() {
         source:       r[14],
       })).filter(e => e.id && e.name && !deletedE.includes(e.id));
       if (equipment.length > 0) DB.setEquipment(equipment);
+    }
+
+    if (dataA.rows && dataA.rows.length > 0) {
+      // Urutan kolom sheet AbsenKontraktor di GAS:
+      // ID,Tanggal,NamaPT,Supervisi,VisitorID,Source,JumlahPekerja,NamaPekerja,JumlahAlat,DaftarAlat,User
+      const absen = dataA.rows.map(r => ({
+        id:         r[0],
+        tanggal:    r[1],
+        pt:         r[2],
+        spv:        r[3],
+        visitorId:  r[4] || null,
+        source:     r[5] || null,
+        pekerja:    r[7] ? String(r[7]).split('\n').map(s => s.trim()).filter(Boolean) : [],
+        alat:       r[9] ? String(r[9]).split('\n').map(s => {
+                      const m = s.trim().match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/i);
+                      return m ? { nama: m[1].trim(), qty: m[2] } : { nama: s.trim(), qty: '1' };
+                    }).filter(a => a.nama) : [],
+        user:       r[10],
+      })).filter(a => a.id && a.pt);
+      if (absen.length > 0) DB.setAbsen(absen);
     }
 
     toast('Data berhasil dimuat dari Google Sheets', 'success');
@@ -4149,11 +4172,13 @@ function markLocalWrite() { lastLocalWriteAt = Date.now(); }
 // ══════════════════════════════════════════
 let lastFingerprintV = null;
 let lastFingerprintE = null;
+let lastFingerprintA = null;
 
 async function fullRefreshFromGAS() {
-  const [dataV, dataE] = await Promise.all([
+  const [dataV, dataE, dataA] = await Promise.all([
     fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'Visitors' }),
     fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'Equipment' }),
+    fetchGAS({ action: 'GET_SHEET_DATA', sheet: 'AbsenKontraktor' }),
   ]);
   const deletedV = getDeletedIds('Visitors');
   const deletedE = getDeletedIds('Equipment');
@@ -4203,6 +4228,29 @@ async function fullRefreshFromGAS() {
       }
     }
   }
+
+  if (dataA.rows) {
+    const absen = dataA.rows
+      .map(r => ({
+        id: r[0], tanggal: r[1], pt: r[2], spv: r[3],
+        visitorId: r[4] || null, source: r[5] || null,
+        pekerja: r[7] ? String(r[7]).split('\n').map(s => s.trim()).filter(Boolean) : [],
+        alat: r[9] ? String(r[9]).split('\n').map(s => {
+                const m = s.trim().match(/^(.+?)\s*\(Qty:\s*(\d+)\)$/i);
+                return m ? { nama: m[1].trim(), qty: m[2] } : { nama: s.trim(), qty: '1' };
+              }).filter(a => a.nama) : [],
+        user: r[10],
+      }))
+      .filter(a => a.id && a.pt);
+    const currentA = DB.absen();
+    if (absen.length > 0 || currentA.length === 0) {
+      if (absen.length >= currentA.length - 2) {
+        DB.setAbsen(absen);
+      } else {
+        console.warn('Skip update absen: data dari Sheets lebih sedikit dari lokal, kemungkinan belum sync.');
+      }
+    }
+  }
   renderPage(currentPage);
 }
 
@@ -4214,16 +4262,18 @@ async function smartPoll() {
 
   try {
     // Cek fingerprint dulu — request ini jauh lebih ringan daripada fetch semua data.
-    const [verV, verE] = await Promise.all([
+    const [verV, verE, verA] = await Promise.all([
       fetchGAS({ action: 'GET_SHEET_VERSION', sheet: 'Visitors' }),
       fetchGAS({ action: 'GET_SHEET_VERSION', sheet: 'Equipment' }),
+      fetchGAS({ action: 'GET_SHEET_VERSION', sheet: 'AbsenKontraktor' }),
     ]);
 
-    const changed = (verV.fingerprint !== lastFingerprintV) || (verE.fingerprint !== lastFingerprintE);
+    const changed = (verV.fingerprint !== lastFingerprintV) || (verE.fingerprint !== lastFingerprintE) || (verA.fingerprint !== lastFingerprintA);
     if (!changed) return; // tidak ada perubahan, skip fetch data penuh
 
     lastFingerprintV = verV.fingerprint;
     lastFingerprintE = verE.fingerprint;
+    lastFingerprintA = verA.fingerprint;
     await fullRefreshFromGAS();
   } catch(e) {
     // silent fail — jangan toast supaya tidak ganggu user
