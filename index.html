@@ -949,7 +949,6 @@ textarea { resize: vertical; min-height: 72px; }
           <i class="ti ti-search"></i>
           <input type="text" class="search-input" id="absen-search" placeholder="Cari nama PT atau supervisi..." oninput="debounce(renderAbsenTable,220)()">
         </div>
-        <button class="btn" onclick="backfillAbsenFromContractorNotes()" title="Sisir data check-in Contractor lama yang Notes-nya berformat daftar bernomor"><i class="ti ti-refresh-dot"></i> Scan Data Lama</button>
         <button class="btn btn-primary" onclick="openModal('modal-absen-kontraktor')"><i class="ti ti-plus"></i> Tambah Absen</button>
       </div>
       <div class="card" style="padding:0">
@@ -1700,27 +1699,6 @@ function debounce(fn, delay) {
 
 function genId(prefix) {
   return prefix + '-' + Math.random().toString(36).substr(2,8).toUpperCase();
-}
-
-// Parse daftar nama pekerja dari teks Catatan dengan format bernomor, contoh:
-// "1. Hadi\n2. Faizi\n3) Thoriq\n4 Boy sandi\n1.man.\n2.samsul."
-// Hanya baris yang DIAWALI angka yang dianggap nama pekerja — baris lain
-// (kalimat bebas tanpa angka di depan) otomatis diabaikan.
-function parseCrewNamesFromNotes(notes) {
-  if (!notes) return [];
-  const lines = notes.split('\n');
-  const names = [];
-  lines.forEach(line => {
-    const trimmed = line.trim();
-    const match = trimmed.match(/^(\d{1,3})[\.\)]?\s*(.+)$/);
-    if (match) {
-      let name = match[2].trim();
-      name = name.replace(/^[\.\-\)]+/, '').trim();   // bersihkan sisa karakter di depan
-      name = name.replace(/\.+$/, '').trim();          // bersihkan titik di akhir
-      if (name.length >= 2) names.push(name);
-    }
-  });
-  return names;
 }
 
 // Cari semua equipment (dari sheet Equipment) yang terkait dengan seorang visitor,
@@ -4093,53 +4071,6 @@ function openAbsenDetail(id) {
     </div>
   `;
   openModal('modal-absen-detail');
-}
-
-// Sisir data Contractor yang SUDAH ADA (check-in lama, termasuk yang sudah
-// kebawa dari Google Sheets) dan otomatis buat record Absen Kontraktor untuk
-// yang Notes-nya berformat daftar bernomor tapi belum punya record absen.
-function backfillAbsenFromContractorNotes() {
-  const visitors = DB.visitors().filter(v => v.visitorType === 'Contractor');
-  const existingAbsen = DB.absen();
-  const existingVisitorIds = new Set(existingAbsen.filter(d => d.visitorId).map(d => d.visitorId));
-  let createdCount = 0;
-  let skippedNoFormat = 0;
-
-  visitors.forEach(v => {
-    if (existingVisitorIds.has(v.id)) return; // sudah pernah dibuatkan absennya
-
-    const crewNames = parseCrewNamesFromNotes(v.notes);
-    if (crewNames.length < 2) { skippedNoFormat++; return; }
-
-    const absenAlat = (v.equipList || [])
-      .filter(item => item && item.nama && item.nama.trim())
-      .map(item => ({ nama: item.nama, qty: item.qty || '1' }));
-
-    const absenData = {
-      id: genId('ABK'),
-      pt: v.company || '',
-      spv: v.host || '',
-      pekerja: crewNames,
-      alat: absenAlat,
-      tanggal: v.checkIn,
-      user: v.user || document.getElementById('sb-uname').textContent,
-      visitorId: v.id,
-      source: 'AUTO_BACKFILL',
-    };
-    existingAbsen.unshift(absenData);
-    createdCount++;
-    sendToGAS('ADD_ABSEN_KONTRAKTOR', absenData);
-  });
-
-  if (createdCount > 0) {
-    DB.setAbsen(existingAbsen);
-    addAudit('CREATE', 'ABSEN_KONTRAKTOR', `[Backfill] ${createdCount} record dibuat otomatis dari Notes check-in lama`);
-    sendLogToGAS('CREATE', 'ABSEN_KONTRAKTOR', `[Backfill] ${createdCount} record dari catatan check-in lama`);
-    toast(`${createdCount} data absen berhasil dibuat dari catatan check-in lama`, 'success');
-    renderAbsenTable();
-  } else {
-    toast(`Tidak ada data baru — ${skippedNoFormat} contractor Notes-nya tidak berformat daftar bernomor, sisanya sudah punya record absen`, 'info');
-  }
 }
 
 function deleteAbsen(id) {
