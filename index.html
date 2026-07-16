@@ -1134,7 +1134,13 @@ textarea { resize: vertical; min-height: 72px; }
       <button class="modal-close" onclick="closeModal('modal-checkin-guest')"><i class="ti ti-x"></i></button>
     </div>
     <div class="form-grid">
-      <div class="form-group"><label>Nama Lengkap *</label><input type="text" id="g-name" placeholder="Nama lengkap"></div>
+      <div class="form-group full">
+        <label>Nama Pengunjung * <span style="font-weight:400;color:var(--text3)">(bisa lebih dari 1 orang, tetap 1 ID)</span></label>
+        <div id="g-nama-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+        <button type="button" class="btn btn-sm" onclick="addGuestNamaRow()">
+          <i class="ti ti-plus"></i> Tambah Nama
+        </button>
+      </div>
       <div class="form-group"><label>Perusahaan / Instansi *</label><input type="text" id="g-company" placeholder="PT / CV / Instansi"></div>
       <div class="form-group"><label>No. HP</label><input type="text" id="g-phone" placeholder="08xxxxxxxxxx"></div>
       <div class="form-group"><label>No. KTP / Passport</label><input type="text" id="g-identity" placeholder="No. identitas"></div>
@@ -1306,7 +1312,13 @@ textarea { resize: vertical; min-height: 72px; }
       <button class="modal-close" onclick="closeModal('modal-checkin-auditor')"><i class="ti ti-x"></i></button>
     </div>
     <div class="form-grid">
-      <div class="form-group"><label>Nama Lengkap *</label><input type="text" id="aud-name" placeholder="Nama lengkap"></div>
+      <div class="form-group full">
+        <label>Nama Pengunjung * <span style="font-weight:400;color:var(--text3)">(bisa lebih dari 1 orang, tetap 1 ID)</span></label>
+        <div id="aud-nama-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+        <button type="button" class="btn btn-sm" onclick="addAuditorNamaRow()">
+          <i class="ti ti-plus"></i> Tambah Nama
+        </button>
+      </div>
       <div class="form-group"><label>Instansi / Lembaga *</label><input type="text" id="aud-company" placeholder="Nama instansi / lembaga audit"></div>
       <div class="form-group"><label>No. HP</label><input type="text" id="aud-phone" placeholder="08xxxxxxxxxx"></div>
       <div class="form-group"><label>No. KTP</label><input type="text" id="aud-identity" placeholder="No. identitas"></div>
@@ -2148,6 +2160,35 @@ function openCheckinByType() {
   } else {
     openModal('modal-select-type');
   }
+}
+
+// ── NAMA PENGUNJUNG ROW (Guest / Auditor — multi nama, 1 ID) ──
+function addGuestNamaRow() {
+  const list = document.getElementById('g-nama-list');
+  const row = document.createElement('div');
+  row.className = 'equip-row';
+  row.innerHTML = `
+    <input type="text" class="g-nama-item" placeholder="Nama pengunjung" style="grid-column:1/-2">
+    <button type="button" class="btn-remove-equip" onclick="this.closest('.equip-row').remove()">
+      <i class="ti ti-x"></i>
+    </button>
+  `;
+  list.appendChild(row);
+  row.querySelector('.g-nama-item').focus();
+}
+
+function addAuditorNamaRow() {
+  const list = document.getElementById('aud-nama-list');
+  const row = document.createElement('div');
+  row.className = 'equip-row';
+  row.innerHTML = `
+    <input type="text" class="aud-nama-item" placeholder="Nama pengunjung" style="grid-column:1/-2">
+    <button type="button" class="btn-remove-equip" onclick="this.closest('.equip-row').remove()">
+      <i class="ti ti-x"></i>
+    </button>
+  `;
+  list.appendChild(row);
+  row.querySelector('.aud-nama-item').focus();
 }
 
 // ── EQUIPMENT ROW (Contractor) ────────────────────────────
@@ -3061,7 +3102,16 @@ function submitCheckinTyped(type) {
 
   const get = (id) => document.getElementById(prefix+'-'+id)?.value?.trim() || '';
 
-  const name = get('name');
+  let namaList = [];
+  if (type === 'Guest') {
+    namaList = [...document.querySelectorAll('#g-nama-list .g-nama-item')].map(el => el.value.trim()).filter(Boolean);
+    if (namaList.length === 0) { toast('Tambahkan minimal 1 nama pengunjung', 'error'); return; }
+  } else if (type === 'Auditor') {
+    namaList = [...document.querySelectorAll('#aud-nama-list .aud-nama-item')].map(el => el.value.trim()).filter(Boolean);
+    if (namaList.length === 0) { toast('Tambahkan minimal 1 nama pengunjung', 'error'); return; }
+  }
+
+  const name = (type === 'Guest' || type === 'Auditor') ? namaList.join(', ') : get('name');
   const host = get('host');
   const purpose = get('purpose');
 
@@ -3084,7 +3134,7 @@ function submitCheckinTyped(type) {
 
   // field per tipe
   if (type === 'Guest') {
-    Object.assign(base, { company: get('company'), phone: get('phone'), identity: get('identity'), dept: document.getElementById('g-dept').value, notes: get('notes') });
+    Object.assign(base, { company: get('company'), phone: get('phone'), identity: get('identity'), dept: document.getElementById('g-dept').value, notes: get('notes'), namaList });
   } else if (type === 'Contractor') {
     const equipRows = [];
     document.querySelectorAll('#con-equipment-list .equip-row').forEach(row => {
@@ -3122,7 +3172,7 @@ function submitCheckinTyped(type) {
   } else if (type === 'Employee Test') {
     Object.assign(base, { company: '—', nik: get('nik'), dept: document.getElementById('emp-dept').value, jabatan: get('jabatan'), notes: get('notes') });
   } else if (type === 'Auditor') {
-    Object.assign(base, { company: get('company'), phone: get('phone'), identity: get('identity'), auditType: document.getElementById('aud-audittype').value, scope: get('scope'), dept: document.getElementById('aud-dept').value, suratTugas: get('surat'), notes: get('notes') });
+    Object.assign(base, { company: get('company'), phone: get('phone'), identity: get('identity'), auditType: document.getElementById('aud-audittype').value, scope: get('scope'), dept: document.getElementById('aud-dept').value, suratTugas: get('surat'), notes: get('notes'), namaList });
   }
 
   const visitors = DB.visitors();
@@ -3195,6 +3245,10 @@ function submitCheckinTyped(type) {
   if (pekerjaListEl) pekerjaListEl.innerHTML = '';
   const equipListEl = document.getElementById('con-equipment-list');
   if (equipListEl) equipListEl.innerHTML = '';
+  const gNamaListEl = document.getElementById('g-nama-list');
+  if (gNamaListEl) gNamaListEl.innerHTML = '';
+  const audNamaListEl = document.getElementById('aud-nama-list');
+  if (audNamaListEl) audNamaListEl.innerHTML = '';
 
   checkAlerts();
   renderPage(currentPage);
