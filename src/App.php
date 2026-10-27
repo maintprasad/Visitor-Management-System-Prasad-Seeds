@@ -148,13 +148,27 @@ final class App
 
     private function panel(): never
     {
-        $config = [
-            'base'    => Request::basePath(),
-            'apiBase' => Request::basePath() . '/api',
-            'units'   => $this->units->active(),
-        ];
-        ob_start();
-        require BASE_PATH . '/views/layout.php';
-        Response::html((string) ob_get_clean());
+        try {
+            $config = [
+                'base'    => Request::basePath(),
+                'apiBase' => Request::basePath() . '/api',
+                'units'   => $this->units->active(),
+            ];
+            ob_start();
+            require BASE_PATH . '/views/layout.php';
+            Response::html((string) ob_get_clean());
+        } catch (\Throwable $e) {
+            if (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            error_log('[VSM] panel: ' . $e::class . ': ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+            $detail = Env::bool('APP_DEBUG') ? '<pre style="white-space:pre-wrap">' . htmlspecialchars($e->getMessage()) . '</pre>' : '';
+            Response::html(
+                '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+                . '<title>Layanan tidak tersedia</title><body style="font-family:system-ui,sans-serif;max-width:520px;margin:15vh auto;padding:0 20px;color:#111827">'
+                . '<h2>Layanan sedang tidak tersedia</h2><p>Sistem tidak dapat terhubung ke database. Silakan coba beberapa saat lagi atau hubungi admin.</p>' . $detail,
+                503
+            );
+        }
     }
 }

@@ -13,7 +13,22 @@ final class Database
 
     public static function connection(): Connection
     {
-        return self::$conn ??= self::make(strtolower(Env::get('DB_DRIVER', 'mysql') ?? 'mysql'));
+        return self::$conn ??= self::make(self::resolveDriver());
+    }
+
+    /**
+     * DB_DRIVER bila diisi. Bila kosong: otomatis Turso kalau kredensial Turso ada
+     * (kasus Vercel / integrasi Turso yang hanya menyuntik URL + token), selain itu MySQL.
+     */
+    public static function resolveDriver(): string
+    {
+        $driver = strtolower(trim((string) Env::get('DB_DRIVER', '')));
+        if ($driver !== '') {
+            return $driver;
+        }
+        $url = (string) Env::get('TURSO_DATABASE_URL', '');
+        $token = (string) Env::get('TURSO_AUTH_TOKEN', '');
+        return ($url !== '' && $token !== '' && !str_contains($url, 'nama-db-anda')) ? 'turso' : 'mysql';
     }
 
     public static function make(string $driver): Connection

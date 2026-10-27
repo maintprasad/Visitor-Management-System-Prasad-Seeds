@@ -31,11 +31,12 @@ final class Env
 
     public static function get(string $key, ?string $default = null): ?string
     {
-        if (isset(self::$vars[$key])) {
-            return self::$vars[$key];
-        }
+        // Environment proses (Vercel, atau "DB_DRIVER=turso php bin/..." di terminal) menang atas file .env.
         $v = getenv($key);
-        return $v === false ? $default : $v;
+        if ($v !== false) {
+            return $v;
+        }
+        return self::$vars[$key] ?? $default;
     }
 
     public static function bool(string $key, bool $default = false): bool
