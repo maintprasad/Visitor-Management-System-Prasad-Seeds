@@ -37,7 +37,7 @@ final class AuthModule implements Module
     /** @param array<string,mixed> $d */
     private function login(Context $ctx, array $d, Request $req): array
     {
-        $username = trim((string) ($d['username'] ?? ''));
+        $username = strtolower(trim((string) ($d['username'] ?? '')));
         $password = (string) ($d['password'] ?? '');
         if ($username === '' || $password === '') {
             throw new ApiException('Username dan password wajib diisi.');

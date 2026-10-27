@@ -28,10 +28,11 @@ final class VisitorModule implements Module
             // App Check-In (publik) & panel
             'CHECKIN_VISITOR' => Action::post(Access::Public, $checkin),
             'SELF_REGISTER'   => Action::post(Access::Public, $checkin),
-            // App Check-Out (publik) & panel
-            'CHECKOUT_VISITOR' => Action::post(Access::Public, fn (Context $c, array $d) => $this->visitors->checkout($c, $d)),
-            'GET_VISITOR'      => Action::get(Access::Public, $this->getVisitor(...)),
-            'GET_ACTIVE_VISITORS' => Action::get(Access::Public, $this->activeVisitors(...)),
+            // Check-Out: wajib login; unit dikunci oleh akun (security Unit 1 tidak bisa check-out visitor Unit 2)
+            'CHECKOUT_VISITOR'    => Action::post(Access::Auth, fn (Context $c, array $d) => $this->visitors->checkout($c, $d)),
+            'GET_ACTIVE_VISITORS' => Action::get(Access::Auth, $this->activeVisitors(...)),
+            // Status visitor untuk halaman QR di HP (app Check-In) — publik, tanpa identitas
+            'GET_VISITOR'         => Action::get(Access::Public, $this->getVisitor(...)),
             // Panel
             'UPDATE_STATUS'    => Action::post(Access::Auth, fn (Context $c, array $d) => $this->visitors->updateStatus($c, $d)),
             'DELETE_ROW'       => Action::post(Access::Auth, $this->deleteRow(...)),
@@ -49,21 +50,17 @@ final class VisitorModule implements Module
             throw new ApiException('Visitor ID tidak ditemukan.');
         }
         if ($ctx->unit !== null && $ctx->unit !== $v['unit_id']) {
-            throw new ApiException('Visitor ini terdaftar di unit lain (' . $v['unit_id'] . ').');
+            throw new ApiException('Visitor ini terdaftar di ' . $this->visitors->unitName($v['unit_id']) . ', bukan ' . $this->visitors->unitName($ctx->unit) . '.');
         }
         return ['visitor' => $this->visitors->presentPublic($v)];
     }
 
     /**
-     * Daftar visitor yang sedang di dalam, untuk tab "Daftar" di app Check-Out.
-     * Berisi nama orang, jadi MATI secara default: set PUBLIC_ACTIVE_LIST=true di .env bila gate Anda memang butuh.
+     * Daftar visitor yang sedang di dalam (tab "Daftar" di app Check-Out), hanya untuk unit akun yang login.
      * @param array<string,mixed> $q
      */
     private function activeVisitors(Context $ctx, array $q, Request $req): array
     {
-        if (!Env::bool('PUBLIC_ACTIVE_LIST')) {
-            throw new ApiException('Daftar visitor aktif dinonaktifkan di server ini. Gunakan scan QR atau input ID.');
-        }
         return ['visitors' => $this->visitors->listInside($ctx->requireUnit())];
     }
 

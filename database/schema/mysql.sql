@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS users (
   unit_id       VARCHAR(8)   NULL,                         -- wajib untuk security
   status        VARCHAR(12)  NOT NULL DEFAULT 'ACTIVE',
   created_at    VARCHAR(30)  NOT NULL,
+  created_by    VARCHAR(60)  NULL,                         -- username admin pembuat akun
+  updated_at    VARCHAR(30)  NULL,
   last_login_at VARCHAR(30)  NULL,
   CONSTRAINT fk_users_unit FOREIGN KEY (unit_id) REFERENCES units(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

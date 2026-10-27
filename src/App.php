@@ -23,6 +23,7 @@ use Vsm\Modules\Logs\LogModule;
 use Vsm\Modules\Logs\LogRepository;
 use Vsm\Modules\Sync\SyncModule;
 use Vsm\Modules\Units\UnitRepository;
+use Vsm\Modules\Users\UserModule;
 use Vsm\Modules\Visitors\VisitorModule;
 use Vsm\Modules\Visitors\VisitorService;
 
@@ -55,6 +56,7 @@ final class App
             new AbsenModule($this->db),
             new LogModule($logs),
             new SyncModule($this->db),
+            new UserModule($this->db, $this->units, $logs),
         ];
         foreach ($modules as $m) {
             $this->actions += $m->actions();
@@ -111,13 +113,25 @@ final class App
         if ($access !== Access::Public && !$claims) {
             throw new ApiException('Sesi berakhir. Silakan login kembali.', 401);
         }
-        if ($access === Access::Admin && ($claims['role'] ?? '') !== 'admin') {
-            throw new ApiException('Hanya admin yang boleh melakukan ini.', 403);
-        }
-
         $requested = $req->header('X-Unit') ?? ($data['unit'] ?? $req->query['unit'] ?? null);
 
         if ($claims) {
+            // Token hanya bukti login; peran, unit & status akun SELALU dibaca ulang dari database,
+            // sehingga akun yang dinonaktifkan/dipindah unit langsung berlaku tanpa menunggu token habis.
+            $row = $this->db->select('SELECT id, username, name, role, unit_id, status FROM users WHERE id = ?', [(int) ($claims['uid'] ?? 0)])[0] ?? null;
+            if (!$row || $row['status'] !== 'ACTIVE') {
+                throw new ApiException('Akun tidak aktif atau sudah dihapus. Hubungi admin.', 401);
+            }
+            $claims['username'] = $row['username'];
+            $claims['name']     = $row['name'];
+            $claims['role']     = $row['role'];
+            if ($row['role'] === 'security') {
+                $claims['unit'] = $row['unit_id'];
+            }
+            if ($access === Access::Admin && $row['role'] !== 'admin') {
+                throw new ApiException('Hanya admin yang boleh melakukan ini.', 403);
+            }
+
             $unit = $claims['unit'] ?? null;
             if (($claims['role'] ?? '') === 'admin' && $requested !== null) {
                 $unit = $this->units->resolve($requested) ?? throw new ApiException('Unit tidak dikenal.');

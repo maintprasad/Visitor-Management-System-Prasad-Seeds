@@ -15,11 +15,15 @@ Alur: visitor daftar di **Check-In** (status *Waiting Approval*) → dapat QR �
 ## Pemisahan Unit 1 / Unit 2
 
 - Setiap baris data (`visitors`, `equipment`, `absen_kontraktor`, `logs`) punya kolom `unit_id` (`U1` / `U2`).
-- **Login terpisah per unit.** Akun `security` terkunci ke satu unit; unit diambil dari token di server,
-  bukan dari kiriman browser, sehingga tidak bisa melihat/mengubah data unit lain.
+- **Login terpisah per unit.** Akun `security` terkunci ke satu unit; unit, peran, dan status akun dibaca ulang dari
+  database di setiap request (bukan dari kiriman browser), sehingga tidak bisa melihat/mengubah data unit lain, dan akun yang
+  dinonaktifkan / dipindah unit langsung berlaku.
 - Akun `admin` boleh berpindah unit lewat pemilih unit di sidebar (data tetap dipisah, tidak digabung).
-- App Check-In / Check-Out dikunci ke unit lewat URL: `...?unit=U1` atau `...?unit=U2` (cetak QR/poster berbeda per gerbang).
-  Check-out visitor Unit 2 lewat app yang dikunci Unit 1 akan ditolak.
+- **Visitor Check-In (app 3)** tidak perlu login (visitor mendaftar sendiri). Unit ditentukan lewat URL `...?unit=U1` / `?unit=U2`
+  (cetak QR/poster berbeda per gerbang).
+- **Visitor Check-Out (app 2)** wajib login dengan **akun yang sama dengan Main Panel**. Unit yang dicek-out ditentukan akun:
+  petugas Unit 1 tidak bisa mencari atau check-out visitor Unit 2 (ditolak server). Setiap check-out tercatat di log beserta petugas dan unitnya.
+- **User Management** (menu khusus admin di Main Panel): tambah user, ubah nama/role/unit, reset password, nonaktifkan, hapus.
 
 ## Struktur
 
@@ -33,6 +37,7 @@ src/
   Database/              Connection, MysqlConnection, TursoConnection (HTTP), Database(factory), Migrator
   Modules/
     Auth/                LOGIN, ME, GET_UNITS, PING
+    Users/               LIST_USERS, CREATE_USER, UPDATE_USER, DELETE_USER (admin)
     Visitors/            CHECKIN_VISITOR, CHECKOUT_VISITOR, GET_VISITOR, UPDATE_STATUS, DELETE_ROW, driver gate pass
     Equipment/           ADD_EQUIPMENT, EQUIPMENT_OUT
     Absen/               ADD_ABSEN_KONTRAKTOR
@@ -46,8 +51,9 @@ _legacy/index.gas.html   file asli versi Google Apps Script (arsip, boleh dihapu
 ```
 
 Protokol API sama dengan versi Apps Script: `POST {action, data}` → `{ok:true,...}` / `{ok:false,error}`;
-`GET ?action=...`. Hanya `LOGIN`, `PING`, `GET_UNITS`, `GET_VISITOR`, `CHECKIN_VISITOR`, `CHECKOUT_VISITOR`,
-`ADD_ABSEN_KONTRAKTOR` yang publik (dipakai app 2 & 3); sisanya wajib token login.
+`GET ?action=...`. Hanya `LOGIN`, `PING`, `GET_UNITS`, `GET_VISITOR` (status QR di HP, tanpa identitas), `CHECKIN_VISITOR`
+dan `ADD_ABSEN_KONTRAKTOR` yang publik (dipakai app Check-In); sisanya — termasuk `CHECKOUT_VISITOR` — wajib token login.
+Aksi user (`LIST_USERS`, `CREATE_USER`, `UPDATE_USER`, `DELETE_USER`) hanya untuk role admin.
 
 ## Database (berdasarkan `database_vsm.xlsx`)
 
@@ -59,7 +65,9 @@ Protokol API sama dengan versi Apps Script: `POST {action, data}` → `{ok:true,
 | Equipment | `equipment` | kolom `Condition` → `item_condition` (kata terlarang di MySQL) |
 | AbsenKontraktor | `absen_kontraktor` | |
 | Logs | `logs` | |
-| — | `units`, `users` | baru: unit & akun login |
+| — | `units`, `users` | baru: unit & akun login (`users` punya `created_by`, `updated_at`) |
+
+Skema yang sudah terlanjur dibuat di MySQL/Turso akan ditambah kolom barunya otomatis saat `php bin/migrate.php` dijalankan lagi (aman diulang).
 
 Waktu disimpan sebagai teks ISO-8601 UTC (sama dengan Excel) di MySQL maupun Turso.
 
@@ -79,8 +87,9 @@ php bin/import-xlsx.php ../database_vsm.xlsx --unit=U1       # data lama -> unit
 Jalankan: `php -S localhost:8000 -t public public/index.php` → buka `http://localhost:8000/`
 atau lewat Apache XAMPP: `http://localhost/vsm_pasuruan/4.%20Visitor-Management-System-Prasad-Seeds-main/public/`.
 
-App 2 & 3: edit `config.js` masing-masing (`API_BASE`), lalu buka mis.
-`http://localhost/vsm_pasuruan/3.%20Visitor-Check-In-Prasad-main/index.html?unit=U1`.
+App 2 & 3: edit `config.js` masing-masing (`API_BASE`), lalu buka:
+- Check-In: `http://localhost/vsm_pasuruan/3.%20Visitor-Check-In-Prasad-main/index.html?unit=U1`
+- Check-Out (login dengan akun Main Panel): `http://localhost/vsm_pasuruan/2.%20Visitor-Check_Out-main/index.html`
 
 > `import-xlsx.php` memberi **semua** baris Excel ke satu unit (`--unit`). Jalankan sekali saja;
 > `--wipe` menghapus dulu data unit tersebut. Nomor telepon dari Excel yang kehilangan angka 0 di depan (`8573…`) dipulihkan menjadi `08573…`.
@@ -102,6 +111,5 @@ PHP di Vercel memakai runtime komunitas (`vercel-php`); cek versi runtime & PHP 
 | Variabel | Fungsi |
 |---|---|
 | `TOKEN_TTL_HOURS` | lama sesi login (default 12 jam) |
-| `PUBLIC_ACTIVE_LIST` | `true` untuk mengaktifkan tab "Daftar" di app Check-Out (menampilkan nama visitor yang sedang di dalam tanpa login) — default mati |
 | `APP_BASE_PATH` | prefix URL bila deteksi subfolder otomatis salah |
 | `APP_DEBUG` | `true` menampilkan pesan error asli di respons API |

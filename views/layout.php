@@ -5,15 +5,15 @@
  */
 require_once __DIR__ . '/helpers.php';
 
-$pages  = ['dashboard', 'visitors', 'equipment', 'realtime', 'alerts', 'emergency', 'absen-kontraktor', 'qr', 'reports', 'audit'];
+$pages  = ['dashboard', 'visitors', 'equipment', 'realtime', 'alerts', 'emergency', 'absen-kontraktor', 'qr', 'reports', 'audit', 'users'];
 $modals = ['checkin-guest', 'checkin-contractor', 'checkin-driver', 'checkin-employee', 'checkin-auditor',
-           'driver-approval', 'select-type', 'absen-kontraktor', 'absen-detail', 'equipment', 'detail'];
+           'driver-approval', 'select-type', 'absen-kontraktor', 'absen-detail', 'equipment', 'detail', 'user'];
 
 // Urutan script penting: sama dengan urutan di file Single-Page lama.
 $scripts = [
     'core/config', 'core/store', 'core/api', 'core/session', 'core/alerts-engine', 'core/navigation',
     'pages/tabs', 'pages/dashboard', 'pages/visitors', 'pages/equipment', 'pages/realtime', 'pages/alerts',
-    'pages/emergency', 'pages/qr', 'pages/reports', 'pages/export-excel', 'pages/audit',
+    'pages/emergency', 'pages/qr', 'pages/reports', 'pages/export-excel', 'pages/audit', 'pages/users',
     'actions/checkin', 'actions/equipment', 'actions/visitor-detail', 'core/ui', 'core/history',
     'pages/absen-kontraktor', 'actions/recheckin', 'actions/contractor-checkout', 'core/sync', 'core/boot',
 ];

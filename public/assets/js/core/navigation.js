@@ -12,6 +12,7 @@ const pageTitles = {
   qr: ['QR Code System', 'Generate dan scan QR visitor'],
   reports: ['Reports & Analytics', 'Laporan harian, mingguan, bulanan'],
   audit: ['Audit Trail', 'Log semua aktivitas sistem'],
+  users: ['User Management', 'Kelola akun security & admin (login Main Panel dan Check-Out)'],
 };
 
 let currentPage = 'dashboard';
@@ -58,4 +59,5 @@ function renderPage(page) {
   if (page === 'qr') renderQR();
   if (page === 'reports') { initReports(); renderReportDaily(); }
   if (page === 'audit') renderAudit();
+  if (page === 'users') loadUsers();
 }

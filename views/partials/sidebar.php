@@ -23,6 +23,8 @@
     <div class="sb-item" onclick="nav('qr',this)"><i class="ti ti-qrcode"></i> QR System</div>
     <div class="sb-item" onclick="nav('reports',this)"><i class="ti ti-chart-bar"></i> Reports</div>
     <div class="sb-item" onclick="nav('audit',this)"><i class="ti ti-history"></i> Audit Trail</div>
+    <div class="sb-section" id="nav-admin-section" style="display:none">Admin</div>
+    <div class="sb-item" id="nav-users" style="display:none" onclick="nav('users',this)"><i class="ti ti-user-cog"></i> User Management</div>
   </nav>
   <div class="sb-user">
     <div class="sb-avatar" id="sb-avatar-text">AR</div>

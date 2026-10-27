@@ -36,8 +36,48 @@ final class Migrator
             }
         }
 
+        $count += $this->upgradeExistingTables();
         $this->seedUnits();
         return $count;
+    }
+
+    /**
+     * Skema lama -> baru untuk tabel yang sudah terlanjur dibuat.
+     * Tiap kolom diperiksa dulu, jadi aman dijalankan berulang.
+     */
+    private function upgradeExistingTables(): int
+    {
+        $added = 0;
+        $columns = [
+            ['users', 'created_by', 'VARCHAR(60) NULL', 'TEXT NULL'],
+            ['users', 'updated_at', 'VARCHAR(30) NULL', 'TEXT NULL'],
+        ];
+        foreach ($columns as [$table, $column, $mysqlType, $tursoType]) {
+            if ($this->hasColumn($table, $column)) {
+                continue;
+            }
+            $type = $this->db->driver() === 'mysql' ? $mysqlType : $tursoType;
+            $this->db->execute("ALTER TABLE {$table} ADD COLUMN {$column} {$type}");
+            $added++;
+        }
+        return $added;
+    }
+
+    /** $table dan $column selalu konstanta dari kode ini (bukan input pengguna). */
+    private function hasColumn(string $table, string $column): bool
+    {
+        if ($this->db->driver() === 'mysql') {
+            return (bool) $this->db->select(
+                'SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+                [$table, $column]
+            );
+        }
+        foreach ($this->db->select("SELECT name FROM pragma_table_info('{$table}')") as $row) {
+            if ($row['name'] === $column) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function seedUnits(): void

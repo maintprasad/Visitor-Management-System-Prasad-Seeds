@@ -92,6 +92,11 @@ const Session = {
     badge.textContent = u.unitName || u.unit;
     badge.style.display = '';
 
+    // Menu User Management hanya untuk admin
+    const admin = u.role === 'admin';
+    document.getElementById('nav-users').style.display = admin ? '' : 'none';
+    document.getElementById('nav-admin-section').style.display = admin ? '' : 'none';
+
     const sw = document.getElementById('unit-switch');
     if (u.role === 'admin' && u.units.length > 1) {
       sw.style.display = '';

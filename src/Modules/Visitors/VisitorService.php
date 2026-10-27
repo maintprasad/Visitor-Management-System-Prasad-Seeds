@@ -27,6 +27,11 @@ final class VisitorService
         private readonly UnitRepository $units,
     ) {}
 
+    public function unitName(string $unit): string
+    {
+        return $this->units->name($unit);
+    }
+
     /** @return array<string,mixed>|null */
     public function find(string $unit, string $id): ?array
     {
@@ -248,8 +253,9 @@ final class VisitorService
             [$out, $duration, $sla, Clock::now(), $id, $unit]
         );
 
-        if (!$auth) {
-            $this->logs->write($unit, 'CHECK_OUT', 'VISITOR', $id, "[{$v['visitor_type']}] {$v['nama']} — check-out mandiri (app Check-Out)", $v['nama']);
+        // Main Panel mencatat log sendiri (ADD_LOG). App Check-Out tidak, jadi server yang mencatat: siapa petugasnya + unitnya.
+        if (!$auth || ($d['source'] ?? '') === 'CHECKOUT_APP') {
+            $this->logs->write($unit, 'CHECK_OUT', 'VISITOR', $id, "[{$v['visitor_type']}] {$v['nama']} — check-out via app Check-Out", $auth ? $ctx->userName() : $v['nama']);
         }
         return [
             'id' => $id, 'checkOut' => $out, 'duration' => $duration,

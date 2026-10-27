@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
   unit_id       TEXT NULL REFERENCES units(id),
   status        TEXT NOT NULL DEFAULT 'ACTIVE',
   created_at    TEXT NOT NULL,
+  created_by    TEXT NULL,
+  updated_at    TEXT NULL,
   last_login_at TEXT NULL
 );
 

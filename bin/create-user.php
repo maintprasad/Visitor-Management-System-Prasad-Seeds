@@ -22,7 +22,7 @@ foreach (array_slice($argv, 1) as $a) {
     }
 }
 
-$username = trim($opt['username'] ?? '');
+$username = strtolower(trim($opt['username'] ?? ''));
 $role     = $opt['role'] ?? 'security';
 if ($username === '' || !in_array($role, ['security', 'admin'], true)) {
     fwrite(STDERR, "Pakai: php bin/create-user.php --username=... --name=... --unit=U1|U2 [--password=...] [--role=security|admin]\n");
