@@ -39,7 +39,8 @@ final class Token
     {
         $key = Env::get('APP_KEY');
         if (!$key || strlen($key) < 16) {
-            throw new \RuntimeException('APP_KEY belum diset (minimal 16 karakter) di .env / environment.');
+            // ApiException agar pesannya sampai ke layar login (aman: tidak memuat nilai rahasia apa pun).
+            throw new ApiException('Konfigurasi server belum lengkap: APP_KEY belum diisi (minimal 32 karakter acak) di Environment Variables.', 500);
         }
         return $key;
     }
