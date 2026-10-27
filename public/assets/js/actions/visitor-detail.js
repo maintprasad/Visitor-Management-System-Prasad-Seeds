@@ -195,7 +195,7 @@ function openDetail(id) {
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <div>${v.notes || '—'}</div>
+        <div style="white-space:pre-wrap">${v.notes ? escapeHtml(v.notes) : '—'}</div>
       </div>
     </div>
     ${equipHTML}

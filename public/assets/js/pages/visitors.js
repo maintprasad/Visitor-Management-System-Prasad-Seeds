@@ -33,7 +33,7 @@ function updateTypeCounts() {
 
 const VISITOR_HEAD_DEFAULT = '<tr><th>#</th><th>Visitor</th><th>Tipe</th><th>Company</th><th>Host / PIC</th><th>Check-in</th><th>Duration</th><th>Status</th><th>Actions</th></tr>';
 // Menu Driver: kolom sesuai isian check-in (tanpa Company & Host / PIC).
-const VISITOR_HEAD_DRIVER = '<tr><th>#</th><th>Driver</th><th>Tipe</th><th>Transporter</th><th>No. Polisi</th><th>Jenis Kendaraan</th><th>Check-in</th><th>Duration</th><th>Status</th><th>Actions</th></tr>';
+const VISITOR_HEAD_DRIVER = '<tr><th>#</th><th>Driver</th><th>Tipe</th><th>Transporter</th><th>No. Polisi</th><th>Jenis Kendaraan</th><th>Catatan</th><th>Check-in</th><th>Duration</th><th>Status</th><th>Actions</th></tr>';
 
 function renderVisitorTable() {
   let visitors = DB.visitors();
@@ -61,7 +61,7 @@ function renderVisitorTable() {
   const thead = document.getElementById('visitor-thead');
   if (thead) thead.innerHTML = driverView ? VISITOR_HEAD_DRIVER : VISITOR_HEAD_DEFAULT;
   if (visitors.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="' + (driverView ? 10 : 9) + '"><div class="empty"><i class="ti ti-users"></i><p>Tidak ada data visitor</p></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="' + (driverView ? 11 : 9) + '"><div class="empty"><i class="ti ti-users"></i><p>Tidak ada data visitor</p></div></td></tr>';
     return;
   }
   tbody.innerHTML = visitors.map((v, i) => `
@@ -75,7 +75,8 @@ function renderVisitorTable() {
       ${driverView ? `
       <td>${v.company && v.company !== '—' ? v.company : '—'}</td>
       <td class="mono">${v.plate || '—'}</td>
-      <td>${v.vehicle || '—'}</td>` : `
+      <td>${v.vehicle || '—'}</td>
+      <td style="max-width:220px;white-space:normal">${v.notes ? escapeHtml(v.notes) : '—'}</td>` : `
       <td>${v.company || '—'}<div class="td-sub">${v.phone || ''}</div></td>
       <td>${v.host}<div class="td-sub">${v.dept || ''}</div></td>`}
       <td class="mono">${fmtDateTime(v.checkIn)}</td>

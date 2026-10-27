@@ -18,6 +18,7 @@
           <option>Pick Up</option>
         </select>
       </div>
+      <div class="form-group full"><label>Catatan</label><textarea id="drv-notes" rows="3" maxlength="500" placeholder="Opsional, mis. muatan / tujuan / keterangan lain"></textarea></div>
     </div>
     <div class="form-actions">
       <button class="btn" onclick="closeModal('modal-checkin-driver')">Batal</button>

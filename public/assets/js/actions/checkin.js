@@ -79,7 +79,7 @@ function submitCheckinTyped(type) {
     base.status = conStatus;
     if (!base.area) { toast('Pilih Area Kerja', 'error'); return; }
   } else if (type === 'Driver') {
-    Object.assign(base, { company: get('company'), plate: get('plate').toUpperCase(), vehicle: document.getElementById('drv-vehicle').value });
+    Object.assign(base, { company: get('company'), plate: get('plate').toUpperCase(), vehicle: document.getElementById('drv-vehicle').value, notes: get('notes') });
   } else if (type === 'Employee Test') {
     Object.assign(base, { company: '—', nik: get('nik'), dept: document.getElementById('emp-dept').value, jabatan: get('jabatan'), notes: get('notes') });
   } else if (type === 'Auditor') {
