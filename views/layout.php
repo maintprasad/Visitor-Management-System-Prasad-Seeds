@@ -26,7 +26,11 @@ $scripts = [
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1829">
-<link rel="icon" href="data:,">
+<link rel="icon" type="image/png" href="<?= e(asset('img/icon-192.png')) ?>">
+<link rel="apple-touch-icon" href="<?= e(asset('img/icon-192.png')) ?>">
+<link rel="manifest" href="<?= e($config['base']) ?>/manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="VSM Pasuruan">
+<meta name="application-name" content="VSM Pasuruan">
 <title>Visitor System Management — Pasuruan</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -72,5 +76,6 @@ $scripts = [
 <?php foreach ($scripts as $s): ?>
 <script src="<?= e(asset("js/{$s}.js")) ?>"></script>
 <?php endforeach; ?>
+<?php require __DIR__ . '/partials/pwa.php'; ?>
 </body>
 </html>

@@ -4,6 +4,8 @@
   },
   "routes": [
     { "src": "/assets/(.*)", "dest": "/public/assets/$1" },
+    { "src": "/sw.js", "headers": { "Cache-Control": "no-cache", "Service-Worker-Allowed": "/" }, "dest": "/public/sw.js" },
+    { "src": "/manifest.webmanifest", "headers": { "Content-Type": "application/manifest+json" }, "dest": "/public/manifest.webmanifest" },
     { "src": "/(.*)", "dest": "/api/index.php" }
   ]
 }
