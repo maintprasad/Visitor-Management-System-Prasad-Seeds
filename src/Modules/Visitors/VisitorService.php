@@ -93,6 +93,11 @@ final class VisitorService
             $d['plate'] = strtoupper(trim((string) $d['plate']));
         }
 
+        if (!$auth && ($dup = $this->findActiveDuplicate($unit, $type, $name, $d))) {
+            // Orang yang sama masih terdaftar aktif (tap ganda, refresh, kirim ulang) -> pakai data yang sudah ada.
+            return ['id' => $dup['id'], 'status' => $dup['status'], 'unit' => $unit, 'existing' => true];
+        }
+
         $id     = Ids::valid($id, 'VIS') ? $id : Ids::make('VIS');
         $now    = Clock::now();
         // Driver langsung Inside saat check-in (tanpa menunggu approval); tipe lain menunggu security.
@@ -135,10 +140,19 @@ final class VisitorService
         ];
 
         $cols = array_keys($row);
-        $this->db->execute(
-            'INSERT INTO visitors (' . implode(', ', $cols) . ') VALUES (' . implode(', ', array_fill(0, count($cols), '?')) . ')',
-            array_values($row)
-        );
+        try {
+            $this->db->execute(
+                'INSERT INTO visitors (' . implode(', ', $cols) . ') VALUES (' . implode(', ', array_fill(0, count($cols), '?')) . ')',
+                array_values($row)
+            );
+        } catch (\Throwable $e) {
+            // Request kembar dengan ID sama baru saja masuk (primary key bentrok) -> kembalikan yang sudah tersimpan.
+            $won = $this->find($unit, $id);
+            if ($won) {
+                return ['id' => $id, 'status' => $won['status'], 'unit' => $unit, 'existing' => true];
+            }
+            throw $e;
+        }
 
         $registered = $this->registerEquipment($unit, $row, $equipList);
 
@@ -146,6 +160,38 @@ final class VisitorService
             $this->logs->write($unit, 'SELF_REGISTER', 'VISITOR', $id, "[{$type}] {$name} — {$purpose} — Self-registration", $name);
         }
         return ['id' => $id, 'status' => $status, 'unit' => $unit, 'equipmentRegistered' => $registered];
+    }
+
+    /**
+     * Pendaftaran aktif (24 jam terakhir) dari orang yang sama di unit ini.
+     * Kunci: tipe + nama + perusahaan/transporter + nomor polisi (driver) / NIK (employee).
+     *
+     * @param array<string,mixed> $d
+     * @return array<string,mixed>|null
+     */
+    private function findActiveDuplicate(string $unit, string $type, string $name, array $d): ?array
+    {
+        $since = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->modify('-24 hours')->format('Y-m-d\TH:i:s.v\Z');
+        $norm  = static fn (mixed $v): string => mb_strtolower(trim((string) $v));
+        $plate = strtoupper(str_replace(' ', '', (string) ($d['plate'] ?? '')));
+        $nik   = $norm($d['nik'] ?? '');
+        $rows  = $this->db->select(
+            "SELECT id, status, nama, company, plat, nik FROM visitors
+             WHERE unit_id = ? AND visitor_type = ? AND created_at >= ?
+               AND status IN ('Waiting Approval', 'Inside', 'Overstay', 'Break')
+             ORDER BY created_at DESC",
+            [$unit, $type, $since]
+        );
+        foreach ($rows as $r) {
+            if ($norm($r['nama']) !== $norm($name)
+                || $norm($r['company'] ?? '') !== $norm($d['company'] ?? '')
+                || strtoupper(str_replace(' ', '', (string) ($r['plat'] ?? ''))) !== $plate
+                || $norm($r['nik'] ?? '') !== $nik) {
+                continue;
+            }
+            return $r;
+        }
+        return null;
     }
 
     /** Panel menyetujui / meng-check-in visitor yang sudah mendaftar sendiri. */
@@ -248,10 +294,15 @@ final class VisitorService
         $duration = Clock::daysBetween($v['check_in'], $out);
         $sla      = $v['sla_start'] ? Clock::daysBetween($v['sla_start'], $out) : null;
 
-        $this->db->execute(
-            "UPDATE visitors SET status = 'Checked Out', check_out = ?, duration = ?, sla_duration = ?, updated_at = ? WHERE id = ? AND unit_id = ?",
+        $changed = $this->db->execute(
+            "UPDATE visitors SET status = 'Checked Out', check_out = ?, duration = ?, sla_duration = ?, updated_at = ? WHERE id = ? AND unit_id = ? AND status <> 'Checked Out'",
             [$out, $duration, $sla, Clock::now(), $id, $unit]
         );
+        if ($changed === 0) {
+            // Request check-out kembar baru saja selesai: jangan hitung / catat dua kali.
+            $cur = $this->find($unit, $id);
+            return ['id' => $id, 'checkOut' => $cur['check_out'] ?? $out, 'already' => true];
+        }
 
         // Main Panel mencatat log sendiri (ADD_LOG). App Check-Out tidak, jadi server yang mencatat: siapa petugasnya + unitnya.
         if (!$auth || ($d['source'] ?? '') === 'CHECKOUT_APP') {
